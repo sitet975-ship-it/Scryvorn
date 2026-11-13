@@ -1,0 +1,14 @@
+{
+  "version": "2026.01",
+  "source": "https://example.org/shortener-domain-list",
+  "date": "2026-01-01",
+  "domains": [
+    "bit.ly",
+    "tinyurl.com",
+    "t.co",
+    "goo.gl",
+    "ow.ly",
+    "is.gd",
+    "buff.ly"
+  ]
+}

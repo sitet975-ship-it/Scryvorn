@@ -1,0 +1,84 @@
+{
+  "version": "2026.01",
+  "source": "https://example.org/scam-trigger-phrase-sets",
+  "date": "2026-01-01",
+  "categories": [
+    {
+      "id": "upfront_payment",
+      "label": "upfront payment request",
+      "phrases": [
+        "pay a fee",
+        "processing fee",
+        "registration fee",
+        "advance payment",
+        "pay upfront",
+        "clearance fee",
+        "release fee"
+      ]
+    },
+    {
+      "id": "credential_request",
+      "label": "credential request",
+      "phrases": [
+        "share your otp",
+        "enter your pin",
+        "your password",
+        "verify your identity",
+        "confirm your code",
+        "send the otp",
+        "provide your credentials"
+      ]
+    },
+    {
+      "id": "urgency_pressure",
+      "label": "urgency pressure",
+      "phrases": [
+        "act now",
+        "urgent",
+        "immediately",
+        "limited time",
+        "expires today",
+        "within 24 hours",
+        "don't delay",
+        "final notice"
+      ]
+    },
+    {
+      "id": "off_platform_move",
+      "label": "off-platform move",
+      "phrases": [
+        "whatsapp me",
+        "message me on telegram",
+        "continue on signal",
+        "email me directly",
+        "contact me outside",
+        "move to another platform"
+      ]
+    },
+    {
+      "id": "crypto_payment_demand",
+      "label": "crypto payment demand",
+      "phrases": [
+        "send bitcoin",
+        "pay in btc",
+        "ethereum payment",
+        "crypto wallet",
+        "transfer usdt",
+        "send to this wallet address"
+      ]
+    },
+    {
+      "id": "suspicious_job_offer",
+      "label": "suspicious job offer",
+      "phrases": [
+        "work from home",
+        "earn money online",
+        "easy money",
+        "no experience needed",
+        "unlimited earnings",
+        "get paid daily",
+        "high salary no interview"
+      ]
+    }
+  ]
+}

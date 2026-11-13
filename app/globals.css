@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-moonlit-midnight: #0D1117;
+  --color-aged-parchment: #F8F3E6;
+  --color-dark-ink: #1A1614;
+  --color-pumpkin-orange: #FF5A1F;
+  --color-crimson-wax: #DC2626;
+  --color-candlelight-gold: #D97706;
+  --color-potion-emerald: #059669;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: var(--color-aged-parchment);
+  color: var(--color-dark-ink);
+  min-height: 100vh;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--color-pumpkin-orange);
+  outline-offset: 2px;
+}
