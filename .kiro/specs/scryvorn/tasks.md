@@ -8,26 +8,26 @@ The implementation follows the layered architecture from the design: pure determ
 
 ## Tasks
 
-- [ ] 1. Set up project structure, data files, and compliance configuration
-  - [ ] 1.1 Initialize Next.js project with TypeScript strict mode and Tailwind CSS
+- [x] 1. Set up project structure, data files, and compliance configuration
+  - [x] 1.1 Initialize Next.js project with TypeScript strict mode and Tailwind CSS
     - Create `package.json` with Next.js, React, TypeScript dependencies
     - Configure `tsconfig.json` with `strict: true`
     - Configure `tailwind.config.ts` with Scryvorn theme color tokens (Moonlit Midnight #0D1117, Warm Aged Parchment #F8F3E6, Dark Ink #1A1614, Pumpkin Orange #FF5A1F, Crimson Wax #DC2626, Candlelight Gold #D97706, Potion Emerald #059669)
     - Set up `postcss.config.ts` for Tailwind
     - _Requirements: 11.1_
 
-  - [ ] 1.2 Create versioned reference data files
+  - [x] 1.2 Create versioned reference data files
     - Create `data/shorteners.json` with `version`, `source`, `date`, and `domains` array (bit.ly, tinyurl.com, t.co, goo.gl, ow.ly, is.gd, buff.ly)
     - Create `data/elevatedAttentionTlds.json` with `version`, `source`, `date`, and `tlds` array (.xyz, .top, .click, .country, .stream, .live, .rest, .cyou); TLD matches are informational context, not a high-risk verdict
     - Create `data/scamTriggers.json` with `version`, `source`, `date`, and `categories` array containing six categories (upfront_payment, credential_request, urgency_pressure, off_platform_move, crypto_payment_demand, suspicious_job_offer), each with `id`, `label`, and `phrases`
     - _Requirements: 4.10, 4.11, 5.1–5.6_
 
-  - [ ] 1.3 Set up testing framework
+  - [x] 1.3 Set up testing framework
     - Install Vitest and `jsdom` only (do not install `@testing-library/react`, `@testing-library/jest-dom`, or `fast-check` until the core scanner works)
     - Create `vitest.config.ts` with jsdom environment and path aliases matching tsconfig
     - Add test scripts to `package.json` (`test`, `test:run`)
 
-  - [ ] 1.4 Create deployment and secrets compliance files
+  - [x] 1.4 Create deployment and secrets compliance files
     - Create `.env.example` listing `AI_API_KEY`, `AI_API_BASE_URL`, `AI_MODEL`, `DOMAIN_AGE_API_URL`, `DOMAIN_AGE_API_KEY` with clearly-placeholder non-functional values
     - Update `.gitignore` to include `.env.local` and keep `.kiro/specs/`, `.kiro/steering/`, `.kiro/hooks/` tracked
     - Verify `LICENSE` contains standard MIT license text
