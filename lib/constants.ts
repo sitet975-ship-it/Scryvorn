@@ -18,6 +18,13 @@ export const INPUT_MAX_CHARS = 10_000;
 export const AI_TIMEOUT_MS = 30_000;
 
 /**
+ * Browser-side timeout for POST /api/scan, in milliseconds. Above
+ * AI_TIMEOUT_MS and below Netlify's 60-second synchronous function limit.
+ * An aborted request is treated as a retryable error.
+ */
+export const SCAN_CLIENT_TIMEOUT_MS = 45_000;
+
+/**
  * Tunable risk weights. The Risk_Score is a pure function of findings.
  * Informational findings carry weight 0 and never add risk.
  */

@@ -179,6 +179,31 @@ function sameSteps(a: readonly string[], b: readonly string[]): boolean {
   return a.length === b.length && a.every((s, i) => s === b[i]);
 }
 
+export type StepSource = "standard" | "ai";
+
+export const STEP_SOURCE_LABELS: Readonly<Record<StepSource, string>> = Object.freeze({
+  standard: "Scryvorn's standard verification guidance",
+  ai: "AI interpretation (model-generated; review before acting)",
+});
+
+/**
+ * The single step-selection rule shared by the report and the UI.
+ * AI steps are used only when AI is available and returned at least one step
+ * (the AI layer already rejects blank or non-string steps). Otherwise the
+ * reviewed FALLBACK_VERIFICATION_STEPS are used: supplied steps would be
+ * inconsistent with an unavailable AI result. Steps identical to the fallback
+ * list are labelled as standard guidance.
+ */
+export function selectRecommendedSteps(
+  result: Pick<ScanResult, "aiAvailable" | "recommendedSteps">,
+): { steps: readonly string[]; source: StepSource } {
+  const steps =
+    result.aiAvailable && result.recommendedSteps.length
+      ? result.recommendedSteps
+      : FALLBACK_VERIFICATION_STEPS;
+  return { steps, source: sameSteps(steps, FALLBACK_VERIFICATION_STEPS) ? "standard" : "ai" };
+}
+
 /** Builds the Markdown Evidence_Report. Throws InvalidTimestampError. */
 export function buildEvidenceReport(result: ScanResult): string {
   const when = utcParts(parseScanTimestamp(result.timestamp)).display;
@@ -261,18 +286,10 @@ export function buildEvidenceReport(result: ScanResult): string {
 
   // 6. Recommended verification steps
   section(5);
-  // Without AI, only the reviewed fallback list is shown (supplied steps would
-  // be inconsistent with an unavailable AI result).
-  const steps =
-    result.aiAvailable && result.recommendedSteps.length
-      ? result.recommendedSteps
-      : FALLBACK_VERIFICATION_STEPS;
-  const standard = sameSteps(steps, FALLBACK_VERIFICATION_STEPS);
+  const { steps, source } = selectRecommendedSteps(result);
   out.push(
     STEPS_ARE_RECOMMENDATIONS_NOTICE,
-    standard
-      ? "Source: Scryvorn's standard verification guidance."
-      : "Source: AI interpretation (model-generated; review before acting).",
+    `Source: ${STEP_SOURCE_LABELS[source]}.`,
     "",
     ...steps.map((s, i) => `${i + 1}. ${md(s)}`),
     "",

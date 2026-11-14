@@ -267,8 +267,8 @@ The implementation follows the layered architecture from the design: pure determ
     - Recommended verification steps are currently included only in the Evidence Report; their UI placement must be decided in Task 9.
     - jsdom tests mock the clipboard and download APIs; they do not verify real browser clipboard writes, downloads, focus rings, layout, or tab order.
 
-- [ ] 9. Assemble page and wire components together
-  - [ ] 9.1 Create sample traps data
+- [x] 9. Assemble page and wire components together
+  - [x] 9.1 Create sample traps data
     - Create `lib/samples/sampleTraps.ts` with three synthetic sample strings
     - "Fake Remote Job DM": fictional remote job scam message with fictional names and URLs
     - "Phishing Payment Link": fictional phishing payment message with placeholder financial details
@@ -277,18 +277,18 @@ The implementation follows the layered architecture from the design: pure determ
     - Do not imply through the "Legitimate Bank Alert" sample or any sample that any bank message is automatically safe
     - _Requirements: 1.2, 1.3, 1.7, 1.8_
 
-  - [ ] 9.2 Implement ScannerCard composition
+  - [x] 9.2 Implement ScannerCard composition
     - Create `components/scanner/ScannerCard.tsx` as a Warm Aged Parchment (#F8F3E6) card with dark ink (#1A1614) text
     - Compose ScannerInput, SampleTrapButtons, LoadingState, SpiderwebCorners, VerifiedChecks, AiInterpretation, WaxSealVerdict, and EvidenceReportExport
     - Ensure decorative spiderweb corners do not overlap the scan input field or results display area
     - _Requirements: 2.2, 2.4_
 
-  - [ ] 9.3 Create root layout
+  - [x] 9.3 Create root layout
     - Create `app/layout.tsx` with root layout, theme fonts, and global Tailwind styles
     - Include Header component and AdvisoryDisclaimer
     - _Requirements: 2.1, 2.2, 8.1_
 
-  - [ ] 9.4 Create main page and wire scan flow
+  - [x] 9.4 Create main page and wire scan flow
     - Create `app/page.tsx` as the single page serving as both scan page and landing page
     - Compose ScannerCard, AdvisoryDisclaimer, and RoadmapSection
     - Wire scanner submission to POST `/api/scan` with `fetch`; send `{ input }` and render result from the single JSON response
@@ -300,7 +300,17 @@ The implementation follows the layered architecture from the design: pure determ
     - Ensure all interactive controls (sample buttons, text input, submit, copy, download) are keyboard-accessible with visible focus states
     - _Requirements: 1.4, 2.6, 2.7, 2.8, 3.1, 3.2, 3.5, 3.6, 3.7, 3.8, 8.2, 8.3_
 
-- [ ] 10. Checkpoint — Ensure all tests pass
+  - Accepted Task 9 deviations, limitations, and pending manual checks:
+    - Added (approved): `RecommendedSteps` between AiInterpretation and the export controls, using the shared `selectRecommendedSteps` rule; `ScannerInput` `serverError` prop; `input_too_long` is shown inline as well as `input_required`; a 45-second client timeout (`SCAN_CLIENT_TIMEOUT_MS`) via AbortController; request/response handling lives in `lib/scan/scanClient.ts`.
+    - EvidenceReportExport is always rendered (after the results) so its buttons stay visibly disabled until a scan completes.
+    - ScannerInput error text now uses Dark Ink with a Crimson Wax left accent border (Task 8 follow-up resolved).
+    - Without AI configured, "Fake Remote Job DM" and "Phishing Payment Link" each produce a deterministic score of 36 and display the Low-risk tier. Their scored findings can come only from scam-trigger phrases, because .example and .test domains are not in the shortener or elevated-attention TLD lists, and the scam-trigger total is capped at 36.
+    - Accepted for the synthetic offline samples. AI is not assumed to elevate either sample to Caution or TRAP DETECTED: live AI output is model-dependent and must be verified on a deploy preview.
+    - No demo-only entries are to be added to the production scam-trigger, shortener, or elevated-attention TLD data lists at this time. SCORING_WEIGHTS and the scam-trigger cap stay unchanged.
+    - Not verified by automated tests (jsdom): spiderweb overlap with the input/results areas, absence of horizontal scrolling at 360/768/1024 px, real focus rings and tab order, real clipboard writes, real downloads, and real network behavior against a deployed `/api/scan`. These need manual browser checks.
+    - Pumpkin Orange focus outlines on parchment measure about 2.81:1, below the 3:1 non-text contrast target; not changed in Task 9 and needs a follow-up decision.
+
+- [x] 10. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
 - [ ] 11. Write integration, component, and compliance tests

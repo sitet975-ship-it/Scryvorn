@@ -185,6 +185,50 @@ describe("ScannerInput", () => {
     }
   });
 
+  it("error text is Dark Ink with a Crimson Wax accent border only (never crimson text)", () => {
+    const { container } = mount(<Harness />);
+    const { error, form } = parts(container);
+    expect(error.className).toContain("text-dark-ink");
+    expect(error.className).not.toContain("text-crimson-wax");
+    expect(error.className).not.toContain("border-crimson-wax"); // no accent while empty
+    submit(form);
+    expect(error.textContent).toBe(INPUT_REQUIRED_MESSAGE);
+    expect(error.className).toContain("text-dark-ink");
+    expect(error.className).toContain("border-l-4");
+    expect(error.className).toContain("border-crimson-wax");
+    expect(error.className).not.toContain("text-crimson-wax");
+    expect(error.getAttribute("role")).toBeNull();
+    // Crimson Wax as text on parchment would miss 4.5:1; Dark Ink passes.
+    expect(contrastRatio("#DC2626", "#F8F3E6")).toBeLessThan(4.5);
+    expect(contrastRatio("#1A1614", "#F8F3E6")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each([
+    ["input_required", INPUT_REQUIRED_MESSAGE],
+    ["input_too_long", INPUT_TOO_LONG_MESSAGE],
+  ] as const)("shows serverError %s inline and keeps the input", (code, message) => {
+    const onSubmit = vi.fn();
+    const { container } = mount(
+      <ScannerInput value="kept text" onChange={() => {}} onSubmit={onSubmit} serverError={code} />,
+    );
+    const { textarea, error } = parts(container);
+    expect(error.textContent).toBe(message);
+    expect(error.getAttribute("aria-live")).toBe("polite");
+    expect(error.className).toContain("border-crimson-wax");
+    expect(textarea.getAttribute("aria-invalid")).toBe("true");
+    expect(textarea.value).toBe("kept text");
+  });
+
+  it("a client-side error takes precedence over serverError", () => {
+    const { container } = mount(
+      <ScannerInput value="   " onChange={() => {}} onSubmit={() => {}} serverError="input_too_long" />,
+    );
+    const { error, form } = parts(container);
+    expect(error.textContent).toBe(INPUT_TOO_LONG_MESSAGE);
+    submit(form);
+    expect(error.textContent).toBe(INPUT_REQUIRED_MESSAGE);
+  });
+
   it("meets 4.5:1 contrast for the submit label (Dark Ink on Pumpkin Orange)", () => {
     const projectInk = contrastRatio("#1A1614", "#FF5A1F");
     const requestedInk = contrastRatio("#1C1917", "#FF5A1F");

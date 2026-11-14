@@ -16,6 +16,11 @@ import { INPUT_MAX_CHARS } from "@/lib/constants";
  * - Errors are announced through an always-present aria-live region and
  *   linked to the textarea with aria-describedby / aria-invalid.
  * - Submission is disabled while `loading`.
+ * - `serverError` shows a server-returned validation error (input_required or
+ *   input_too_long) in the same live region. A client-side error takes
+ *   precedence. The parent clears `serverError` when the input changes.
+ * - Error text is Dark Ink; Crimson Wax is used only as a left accent border
+ *   (Crimson Wax text on parchment is about 4.36:1, below 4.5:1).
  */
 export const SUBMIT_LABEL = "Inspect for Traps";
 export const INPUT_REQUIRED_MESSAGE = "Input required.";
@@ -23,15 +28,23 @@ export const INPUT_TOO_LONG_MESSAGE = "Maximum input length exceeded (10,000 cha
 
 const formatCount = (n: number) => n.toLocaleString("en-US");
 type InputError = "required" | "too_long" | null;
+export type ServerInputError = "input_required" | "input_too_long";
 
 export interface ScannerInputProps {
   value: string;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
   loading?: boolean;
+  serverError?: ServerInputError | null;
 }
 
-export function ScannerInput({ value, onChange, onSubmit, loading = false }: ScannerInputProps) {
+export function ScannerInput({
+  value,
+  onChange,
+  onSubmit,
+  loading = false,
+  serverError = null,
+}: ScannerInputProps) {
   const id = useId();
   const [error, setError] = useState<InputError>(null);
   const inputId = `${id}-input`;
@@ -74,8 +87,11 @@ export function ScannerInput({ value, onChange, onSubmit, loading = false }: Sca
     onSubmit(value);
   }
 
+  const shown: InputError =
+    error ??
+    (serverError === "input_required" ? "required" : serverError === "input_too_long" ? "too_long" : null);
   const message =
-    error === "required" ? INPUT_REQUIRED_MESSAGE : error === "too_long" ? INPUT_TOO_LONG_MESSAGE : "";
+    shown === "required" ? INPUT_REQUIRED_MESSAGE : shown === "too_long" ? INPUT_TOO_LONG_MESSAGE : "";
 
   return (
     <form onSubmit={handleSubmit} noValidate className="flex flex-col gap-2">
@@ -88,7 +104,7 @@ export function ScannerInput({ value, onChange, onSubmit, loading = false }: Sca
         onChange={(e) => handleChange(e.target.value)}
         onPaste={handlePaste}
         rows={8}
-        aria-invalid={error ? true : undefined}
+        aria-invalid={shown ? true : undefined}
         aria-describedby={`${counterId} ${errorId}`}
         className="w-full resize-y rounded border border-dark-ink/40 bg-white p-3 text-dark-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pumpkin-orange"
       />
@@ -96,7 +112,12 @@ export function ScannerInput({ value, onChange, onSubmit, loading = false }: Sca
         <span id={counterId} data-counter="">
           {formatCount(value.length)} / {formatCount(INPUT_MAX_CHARS)}
         </span>
-        <p id={errorId} aria-live="polite" className="font-semibold text-crimson-wax">
+        <p
+          id={errorId}
+          aria-live="polite"
+          data-error={shown ?? ""}
+          className={`font-semibold text-dark-ink ${message ? "border-l-4 border-crimson-wax pl-2" : ""}`}
+        >
           {message}
         </p>
       </div>
