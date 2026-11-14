@@ -34,12 +34,19 @@ function defangScheme(_match: string, scheme: string): string {
   return `${scheme}[://]`;
 }
 
-export function toSafeMarkdownText(value: unknown): string {
+/**
+ * Steps 1–4 only (no Markdown escaping), for showing untrusted text as plain
+ * React text in the UI with the same defanging as the Evidence_Report.
+ */
+export function defangText(value: unknown): string {
   if (typeof value !== "string") return "";
   return value
     .replace(LINE_BREAKS, " ")
     .replace(INVISIBLE_OR_CONTROL, "\uFFFD")
     .replace(SCHEME, defangScheme)
-    .replace(DOMAIN_DOT, "$1[.]")
-    .replace(MARKDOWN_PUNCTUATION, "\\$&");
+    .replace(DOMAIN_DOT, "$1[.]");
+}
+
+export function toSafeMarkdownText(value: unknown): string {
+  return defangText(value).replace(MARKDOWN_PUNCTUATION, "\\$&");
 }

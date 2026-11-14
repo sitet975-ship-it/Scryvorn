@@ -196,7 +196,7 @@ The implementation follows the layered architecture from the design: pure determ
 
   - [x] 7.2 Implement SpiderwebCorners component
     - Create `components/theme/SpiderwebCorners.tsx` with decorative geometric SVG corner accents
-    - Set `aria-hidden="true"`, `pointer-events: none`; position to not overlap input or results areas
+    - Set `aria-hidden="true"`, `pointer-events: none`; position to not overlap input or results areas (layout overlap to be verified during Task 9.2)
     - _Requirements: 2.4_
 
   - [x] 7.3 Implement ScannerInput component
@@ -220,20 +220,20 @@ The implementation follows the layered architecture from the design: pure determ
     - Do not display individual deterministic-check completion updates (single request/response flow)
     - _Requirements: 2.8, 3.2_
 
-- [ ] 8. Implement results, export, advisory, and roadmap UI components
-  - [ ] 8.1 Implement VerifiedChecks component
+- [x] 8. Implement results, export, advisory, and roadmap UI components
+  - [x] 8.1 Implement VerifiedChecks component
     - Create `components/scanner/VerifiedChecks.tsx` rendering only deterministic findings
     - Display a visible heading identifying evidence type as deterministic
     - Render each finding as a discrete item with label identifying the check type and affected URL, and evidence value stating the outcome
     - _Requirements: 4.5, 7.1, 7.3_
 
-  - [ ] 8.2 Implement AiInterpretation component
+  - [x] 8.2 Implement AiInterpretation component
     - Create `components/scanner/AiInterpretation.tsx` rendering only AI findings
     - Display a visible heading identifying evidence type as AI-generated
     - Show explicit "AI analysis unavailable" notice when AI is unavailable; never display fabricated AI findings
     - _Requirements: 7.2, 7.3, 7.4, 7.5_
 
-  - [ ] 8.3 Implement WaxSealVerdict component
+  - [x] 8.3 Implement WaxSealVerdict component
     - Create `components/scanner/WaxSealVerdict.tsx` rendering a wax-seal-style stamp
     - Display Severity_Tier and Risk_Score; color per tier (Crimson Wax #DC2626 for TRAP DETECTED, Candlelight Gold #D97706 for Caution, Potion Emerald #059669 for Low risk)
     - Never render "Verified Safe" or any wording claiming the input is definitively safe
@@ -241,7 +241,7 @@ The implementation follows the layered architecture from the design: pure determ
     - When the deterministic run is incomplete, show that the checks did not complete instead of a completed "Low risk" stamp (Req 6.9)
     - _Requirements: 6.2, 6.3, 6.4, 6.6, 6.7, 6.9_
 
-  - [ ] 8.4 Implement EvidenceReportExport component
+  - [x] 8.4 Implement EvidenceReportExport component
     - Create `components/scanner/EvidenceReportExport.tsx` with "Copy Evidence Report" and "Download Report (.md)" buttons
     - Copy button copies full report text to system clipboard and shows confirmation indicating copy succeeded
     - Download button triggers Markdown file download with timestamped filename
@@ -250,16 +250,22 @@ The implementation follows the layered architecture from the design: pure determ
     - All controls keyboard-accessible with visible focus states
     - _Requirements: 9.1, 9.2, 9.5, 9.6_
 
-  - [ ] 8.5 Implement AdvisoryDisclaimer component
+  - [x] 8.5 Implement AdvisoryDisclaimer component
     - Create `components/scanner/AdvisoryDisclaimer.tsx` rendering advisory disclaimer banner
     - Display text stating Scryvorn provides risk signals and verification guidance, not financial, legal, or law-enforcement advice
     - _Requirements: 8.1_
 
-  - [ ] 8.6 Implement RoadmapSection component
+  - [x] 8.6 Implement RoadmapSection component
     - Create `components/roadmap/RoadmapSection.tsx` with "Coming Soon — Product Roadmap" heading
     - Display "Contract & Lease PDF X-Ray" and "Subscription Drain Hunter" as distinct roadmap items showing their title text
     - No implementation of contract/lease PDF parsing, bank-statement analysis, or subscription-drain detection functionality
     - _Requirements: 10.1, 10.2, 10.3_
+
+  - Accepted Task 8 deviations and follow-ups:
+    - `lib/report/` exports were refactored to share defanging (`defangText`), check labels, finding partitioning, and fixed notices with the UI. The report output is behavior-preserving and the existing report tests pass.
+    - Crimson Wax (#DC2626) text on parchment (#F8F3E6) is about 4.36:1, below the 4.5:1 normal-text target. Task 8 uses dark-ink error text with a Crimson Wax accent border. The Task 7 ScannerInput error text still uses Crimson Wax and needs a contrast follow-up in Task 9.
+    - Recommended verification steps are currently included only in the Evidence Report; their UI placement must be decided in Task 9.
+    - jsdom tests mock the clipboard and download APIs; they do not verify real browser clipboard writes, downloads, focus rings, layout, or tab order.
 
 - [ ] 9. Assemble page and wire components together
   - [ ] 9.1 Create sample traps data

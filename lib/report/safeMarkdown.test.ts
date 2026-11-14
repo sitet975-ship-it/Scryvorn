@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { toSafeMarkdownText as md } from "./safeMarkdown";
+import { defangText, toSafeMarkdownText as md } from "./safeMarkdown";
 
 /**
  * True if any `ch` is unescaped: preceded by an even number (including zero)
@@ -112,5 +112,21 @@ describe("toSafeMarkdownText", () => {
   it("returns an empty string for non-string input", () => {
     expect(md(undefined)).toBe("");
     expect(md(42)).toBe("");
+  });
+});
+
+describe("defangText (UI plain-text defanging)", () => {
+  it("applies the report's defanging without Markdown escaping", () => {
+    expect(defangText("Visit https://pay.example.test/a_b now")).toBe("Visit hxxps://pay[.]example[.]test/a_b now");
+    expect(defangText("ftp://files.example")).toBe("ftp[://]files[.]example");
+    expect(defangText("line1\nline2\u202E")).toBe("line1 line2\uFFFD");
+    expect(defangText(42)).toBe("");
+  });
+
+  it("toSafeMarkdownText is defangText plus Markdown escaping", () => {
+    const samples = ["<b>*x*</b> https://a.example/[y](z)", "plain", "a\\b `c`", ""];
+    for (const s of samples) {
+      expect(md(s)).toBe(defangText(s).replace(/[\\`*_{}[\]()#+\-.!|<>~&]/g, "\\$&"));
+    }
   });
 });

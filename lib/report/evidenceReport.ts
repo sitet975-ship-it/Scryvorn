@@ -20,6 +20,29 @@ export const LOOKALIKE_INACTIVE_NOTICE =
 export const LOOKALIKE_CONFIGURED_NOTICE =
   "Lookalike checking is configured with a reference list. Configuration alone does not prove the check ran for every URL.";
 export const AI_UNAVAILABLE_NOTICE = "AI analysis unavailable";
+export const INFORMATIONAL_CONTEXT_NOTICE =
+  "These findings add no risk score. They are context, not evidence that a link is safe or fraudulent.";
+export const AI_NO_FINDINGS_NOTICE =
+  "The AI interpretation reported no findings. This is not proof that the message is safe.";
+export const AI_FINDINGS_ARE_INTERPRETATION_NOTICE =
+  "AI findings are model interpretations of the message text, with the model's confidence. They are not verified facts or proof of fraud.";
+export const DOMAIN_AGE_SKIPPED_NOTICE =
+  "Domain age: skipped because the required checks did not complete.";
+
+/** "AI analysis unavailable (<reason>)." */
+export function aiUnavailableNotice(reason: "timeout" | "error" | undefined): string {
+  const why =
+    reason === "timeout"
+      ? "the AI service did not respond in time"
+      : "the AI service returned an error or an unusable response";
+  return `${AI_UNAVAILABLE_NOTICE} (${why}).`;
+}
+
+/** Sentence for a required check that did not finish. */
+export function unfinishedCheckNotice(label: string): string {
+  return `${label}: did not finish because of an unexpected internal failure. A missing finding here is not a passed check.`;
+}
+
 export const STEPS_ARE_RECOMMENDATIONS_NOTICE =
   "These are recommendations for you to carry out. Scryvorn did not visit, open, or confirm any link or destination.";
 
@@ -101,19 +124,38 @@ export function reportFilename(timestamp: string): string {
   return `scryvorn-report-${date}-${time}.md`;
 }
 
-const CHECK_LABELS: Record<CheckName, string> = {
+export const CHECK_LABELS: Readonly<Record<CheckName, string>> = Object.freeze({
   url_extraction: "URL extraction",
   https_status: "HTTPS status",
   shortener: "URL-shortener detection",
   domain_heuristic: "Domain heuristics (elevated-attention TLD and lookalike)",
   scam_triggers: "Scam-trigger phrase detection",
   domain_age: "Domain age",
-};
+});
 
-function checkLabel(check: string): string {
+/** Fixed label for a known check, or null for an unknown name. */
+export function knownCheckLabel(check: string): string | null {
   return Object.prototype.hasOwnProperty.call(CHECK_LABELS, check)
     ? CHECK_LABELS[check as CheckName]
-    : md(check);
+    : null;
+}
+
+function checkLabel(check: string): string {
+  return knownCheckLabel(check) ?? md(check);
+}
+
+/**
+ * Groups deterministic findings the way the report presents them:
+ * scored (weight > 0), informational (weight 0, not the domain-age note),
+ * and domain-age-unavailable notes.
+ */
+export function partitionDeterministicFindings(findings: readonly DeterministicFinding[]) {
+  const ageNotes = findings.filter((f) => f.category === "domain_age_unavailable");
+  const scored = findings.filter((f) => f.category !== "domain_age_unavailable" && f.weight > 0);
+  const informational = findings.filter(
+    (f) => f.category !== "domain_age_unavailable" && !(f.weight > 0),
+  );
+  return { scored, informational, ageNotes };
 }
 
 function deterministicItem(f: DeterministicFinding, showWeight: boolean): string[] {
@@ -141,11 +183,8 @@ function sameSteps(a: readonly string[], b: readonly string[]): boolean {
 export function buildEvidenceReport(result: ScanResult): string {
   const when = utcParts(parseScanTimestamp(result.timestamp)).display;
   const complete = result.deterministicStatus === "complete";
-  const det = result.deterministicFindings;
-  const ageNotes = det.filter((f) => f.category === "domain_age_unavailable");
-  const scored = det.filter((f) => f.category !== "domain_age_unavailable" && f.weight > 0);
-  const informational = det.filter(
-    (f) => f.category !== "domain_age_unavailable" && !(f.weight > 0),
+  const { scored, informational, ageNotes } = partitionDeterministicFindings(
+    result.deterministicFindings,
   );
   const unfinished = complete ? [] : result.incompleteChecks;
 
@@ -186,7 +225,7 @@ export function buildEvidenceReport(result: ScanResult): string {
   section(2);
   if (informational.length) {
     out.push(
-      "These findings add no risk score. They are context, not evidence that a link is safe or fraudulent.",
+      INFORMATIONAL_CONTEXT_NOTICE,
       "",
       ...informational.flatMap((f) => deterministicItem(f, false)),
     );
@@ -201,12 +240,10 @@ export function buildEvidenceReport(result: ScanResult): string {
   if (!result.lookalikeCheckActive) notPerformed.push(`- ${LOOKALIKE_INACTIVE_NOTICE}`);
   for (const f of ageNotes) notPerformed.push(...deterministicItem(f, false));
   for (const c of unfinished) {
-    notPerformed.push(
-      `- ${checkLabel(c)}: did not finish because of an unexpected internal failure. A missing finding here is not a passed check.`,
-    );
+    notPerformed.push(`- ${unfinishedCheckNotice(checkLabel(c))}`);
   }
   if (!complete) {
-    notPerformed.push("- Domain age: skipped because the required checks did not complete.");
+    notPerformed.push(`- ${DOMAIN_AGE_SKIPPED_NOTICE}`);
   }
   if (!result.aiAvailable) notPerformed.push(`- AI interpretation: ${AI_UNAVAILABLE_NOTICE}.`);
   out.push(...(notPerformed.length ? notPerformed : ["None reported."]), "");
@@ -214,19 +251,11 @@ export function buildEvidenceReport(result: ScanResult): string {
   // 5. AI interpretation
   section(4);
   if (!result.aiAvailable) {
-    const why =
-      result.aiUnavailableReason === "timeout"
-        ? "the AI service did not respond in time"
-        : "the AI service returned an error or an unusable response";
-    out.push(`${AI_UNAVAILABLE_NOTICE} (${why}). No AI findings are shown.`);
+    out.push(`${aiUnavailableNotice(result.aiUnavailableReason)} No AI findings are shown.`);
   } else if (result.aiFindings.length) {
-    out.push(
-      "AI findings are model interpretations of the message text, with the model's confidence. They are not verified facts or proof of fraud.",
-      "",
-      ...result.aiFindings.map(aiItem),
-    );
+    out.push(AI_FINDINGS_ARE_INTERPRETATION_NOTICE, "", ...result.aiFindings.map(aiItem));
   } else {
-    out.push("The AI interpretation reported no findings. This is not proof that the message is safe.");
+    out.push(AI_NO_FINDINGS_NOTICE);
   }
   out.push("");
 
