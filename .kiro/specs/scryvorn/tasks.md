@@ -4,7 +4,7 @@
 
 Scryvorn is a single-page Next.js application that runs a two-layer forensics pipeline on user-pasted suspicious messages and URLs: deterministic, rule-based checks first, then AI interpretation. The pipeline combines both layers into a 0–100 Risk_Score and a Severity_Tier rendered as a wax-seal stamp, with itemized evidence split into separate "Verified Checks" and "AI Interpretation" sections. The user can copy or download an Evidence_Report. The app degrades gracefully when the AI service or optional domain-age lookup is unavailable, never claims a message is definitively safe, and retains nothing beyond the page session.
 
-The implementation follows the layered architecture from the design: pure deterministic check functions in `/lib/checks/`, AI interpretation in `/lib/ai/`, scoring and report generation in `/lib/scoring/` and `/lib/report/`, a single Edge Runtime POST route at `/api/scan`, and modular React components with the Autumn Lantern theme. Tasks build incrementally from project setup through core logic, API orchestration, UI components, and final wiring, with property-based tests placed close to each implementation.
+The implementation follows the layered architecture from the design: pure deterministic check functions in `/lib/checks/`, AI interpretation in `/lib/ai/`, scoring and report generation in `/lib/scoring/` and `/lib/report/`, a single Node.js-runtime POST route at `/api/scan` (deployed on Netlify as a serverless function), and modular React components with the Autumn Lantern theme. Tasks build incrementally from project setup through core logic, API orchestration, UI components, and final wiring, with property-based tests placed close to each implementation.
 
 ## Tasks
 
@@ -167,19 +167,24 @@ The implementation follows the layered architecture from the design: pure determ
     - **Validates: Requirements 6.8, 9.2, 9.4, 7.5**
 
 - [ ] 6. Implement API scan route
-  - [ ] 6.1 Implement POST /api/scan route (Edge Runtime)
-    - Create `app/api/scan/route.ts` as an Edge Runtime POST handler
-    - Validate input: return 400 `{ "error": "input_required" }` if empty-after-trim, 400 `{ "error": "input_too_long" }` if length exceeds 10000
-    - Run deterministic checks to completion first, then run AI interpretation, then combine via scoring
-    - If AI is unavailable (timeout or error), complete scan with deterministic results only; set `aiAvailable: false` and `aiUnavailableReason`
-    - Derive `inputType` from whether URLs were found in the input
-    - Return 200 with full `ScanResult` JSON (timestamp, inputType, riskScore, severityTier, waxSealColor, deterministicFindings, aiFindings, recommendedSteps, aiAvailable, aiUnavailableReason, disclaimer)
-    - No logging of user input, URLs, or scan results; return sanitized error responses on unexpected errors without echoing user data
+  - [ ] 6.1 Implement POST /api/scan route (Node.js runtime)
+    - Create `app/api/scan/route.ts` as a POST handler on the standard Next.js App Router Node.js runtime; do not use the Edge Runtime (Req 11.7)
+    - Validate in this order: `Content-Type` is `application/json`, the body parses as a JSON object, and `input` is a string, otherwise 400 `{ "error": "invalid_request" }`; then 400 `{ "error": "input_required" }` if empty after trimming; then 400 `{ "error": "input_too_long" }` if longer than `INPUT_MAX_CHARS`
+    - Read only `input` from the body; ignore any client-supplied findings, weights, scores, or tiers; generate all findings server-side
+    - Run the deterministic checks to completion, build the summary with `buildDeterministicSummary` (`lib/ai/deterministicSummary.ts`, see design "Deterministic summary"), then run AI interpretation, then combine with `assessScan`
+    - Run AI interpretation even when the deterministic run is incomplete; `assessScan` still returns the incomplete variant with null `riskScore`, `severityTier`, and `waxSealColor`; do not add a `"skipped"` value to `aiUnavailableReason`
+    - If AI is unavailable (timeout or error), complete the scan with deterministic results only; `aiAvailable: false` and `aiUnavailableReason` come from `assessScan`
+    - Derive `inputType` from whether URLs were found in the input; set `timestamp` as an ISO 8601 UTC string
+    - Return 200 with the full discriminated `ScanResult` JSON: `timestamp`, `inputType`, `deterministicStatus`, `incompleteChecks`, `riskScore`, `severityTier`, `waxSealColor`, `deterministicFindings`, `aiFindings`, `recommendedSteps`, `aiAvailable`, `aiUnavailableReason` (only when AI is unavailable), `lookalikeCheckActive`, `domainAgeAvailable`, `disclaimer`; score, tier, and color are `null` for incomplete runs
     - Build the response with `assessScan` (do not reconstruct the completion rule); an incomplete run must not be returned as a completed "Low risk" assessment (Req 6.9)
-    - Generate all findings server-side; never score findings or weights supplied by the client
-    - Before starting Task 6: reconcile the Cloudflare-to-Netlify deployment target across steering, Req 11.1, design, this task's runtime choice, `package.json`, and `wrangler.toml` (required decision; see design "Deployment Topology")
-    - Before enabling a production domain-age service, define an approved overall lookup budget or bounded lookup policy
-    - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 6.8, 6.9, 8.2, 8.4, 8.5, 11.1_
+    - Return 500 `{ "error": "internal_error" }` for any unexpected failure; error bodies are fixed strings that never echo the request
+    - Set `Cache-Control: no-store` on every response; no logging of user input, URLs, findings, AI output, or results on any path
+    - Non-POST methods: rely on the framework's 405, to be confirmed on the first Netlify deploy
+    - Keep `AI_TIMEOUT_MS` at 30,000 ms; the route runs within Netlify's 60-second synchronous limit (not configurable); do not claim a proven safety margin until a deploy-preview request is measured
+    - `DETERMINISTIC_SUMMARY_MAX_FINDINGS`, `DETERMINISTIC_SUMMARY_MAX_LINE_CHARS`, and `DETERMINISTIC_SUMMARY_MAX_TOTAL_CHARS` values require approval before implementation
+    - Do not enable a production domain-age service until a bounded policy is approved: maximum lookups per scan, per-lookup timeout, overall budget, behavior when the budget is reached, and `AbortSignal` support (Req 11.10; design "Domain-age lookup timing")
+    - Before deployment, complete the pre-deployment checks in design "Deployment Topology" (publish-directory auto-detection, route handler and 405 behavior, environment variables on the actual plan, measured deploy-preview request)
+    - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 6.8, 6.9, 8.2, 8.4, 8.5, 11.1, 11.7, 11.8, 11.9, 11.10_
 
 - [ ] 7. Implement theme and scanner input UI components
   - [ ] 7.1 Implement Header component
@@ -325,7 +330,9 @@ The implementation follows the layered architecture from the design: pure determ
     - Assert `LICENSE` contains MIT text
     - Assert no contract-PDF, bank-statement, or subscription-drain modules exist in the codebase
     - Assert build succeeds without those modules
-    - _Requirements: 4.10, 10.3, 11.1, 11.3, 11.4, 11.5, 11.6_
+    - Assert `app/api/scan/route.ts` does not export `runtime = "edge"` (Req 11.7)
+    - Assert `netlify.toml`, if present, declares no secret environment variables (Req 11.9)
+    - _Requirements: 4.10, 10.3, 11.1, 11.3, 11.4, 11.5, 11.6, 11.7, 11.9_
 
 - [ ] 12. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.

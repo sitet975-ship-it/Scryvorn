@@ -181,13 +181,19 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 
 ### Requirement 11: Deployment and Secrets Compliance
 
-**User Story:** As a maintainer, I want a deployable, secret-free codebase, so that the app can run on Cloudflare Pages without leaking credentials.
+**User Story:** As a maintainer, I want a deployable, secret-free codebase, so that the app can run on Netlify without leaking credentials.
 
 #### Acceptance Criteria
 
-1. WHEN the Scryvorn is deployed to Cloudflare Pages, THE Scryvorn SHALL build successfully using only committed files and environment variables, without requiring local-only files or uncommitted secrets.
+1. WHEN the Scryvorn is deployed to Netlify, THE Scryvorn SHALL build successfully using only committed files and environment variables, without requiring local-only files or uncommitted secrets.
 2. THE Scryvorn SHALL load all secrets from environment variables via `.env.local` during local development.
 3. THE Scryvorn SHALL NOT contain API keys, tokens, passwords, or other credentials as literal string values in committed source files.
 4. THE Scryvorn SHALL include a LICENSE file containing the standard MIT license text in the public repository.
 5. THE Scryvorn SHALL provide a `.env.example` file listing every required environment variable with non-functional placeholder values that are clearly identifiable as examples.
 6. THE Scryvorn SHALL list `.env.local` in `.gitignore` so that local secrets are not committed to version control.
+7. THE scan API route SHALL run on the standard Next.js App Router Node.js runtime and SHALL NOT use the Edge Runtime.
+8. THE scan API route SHALL complete within Netlify's synchronous function execution limit of 60 seconds, which is not configurable. THE 30-second AI timeout SHALL NOT be described as leaving a proven safety margin until a deploy-preview request has been measured.
+9. IN production, THE Scryvorn SHALL read server secrets only from Netlify environment variables that are available to functions at runtime. Secrets SHALL NOT be declared in `netlify.toml`, because variables declared there are not available to functions.
+10. THE Scryvorn SHALL NOT enable a production domain-age lookup service until an approved, bounded lookup policy exists (Design: "Domain-age lookup timing").
+
+> **Transition note:** the Cloudflare configuration (`package.json` `pages:build` and `@cloudflare/next-on-pages`, `.npmrc`, `wrangler.toml`, and the related `.gitignore` entries) is still in the repository and will be removed in a separate, approved change. Until then it is unused for deployment.

@@ -11,14 +11,14 @@ This design covers the MVP only: the message-and-URL scanner. Contract/lease PDF
 - **Verifiable over decorative.** Every material claim in the UI is backed by quoted text, a URL/domain check output, or a stated rule. The Deterministic_Check_Engine is a set of pure functions so its output is reproducible and testable.
 - **Graceful degradation.** The scan remains useful with only deterministic findings if the AI service times out (30 s) or errors, and with no domain-age data if that optional lookup is unconfigured or fails.
 - **No persistence, no leakage.** Inputs and results live only in component state for the page session and are never written to a database, file, log, analytics service, or client-side storage.
-- **Deployable as committed.** The build succeeds on Cloudflare Pages using only committed files and environment variables; no local-only files or committed secrets are required.
+- **Deployable as committed.** The build succeeds on Netlify using only committed files and environment variables; no local-only files or committed secrets are required.
 
 ### Key Design Decisions
 
 | Decision | Rationale |
 |---|---|
 | One scan API route (`/api/scan`) using a standard POST request/response | A single server-side route runs the full pipeline — deterministic checks first, then AI, then combine — and returns one JSON response. The UI shows a simple loading state while the request is in flight. Keeps orchestration server-side without splitting it to the client. |
-| Edge Runtime on the scan route | Required for Cloudflare Pages (`@cloudflare/next-on-pages`); `fetch` is available for the AI and domain-age calls. A standard edge POST handler with no special configuration. |
+| Node.js runtime on the scan route (no Edge Runtime) | Netlify runs Next.js route handlers as serverless functions through its OpenNext adapter, with no extra configuration. Node.js is the Next.js default and recommended runtime. `process.env`, `fetch`, and `AbortController` are available to the existing AI engine. The Edge Runtime is not used: Netlify runs Edge-runtime SSR pages on the Node.js runtime anyway, and current Next.js docs deprecate it. |
 | Deterministic checks are pure functions; only the optional domain-age lookup is async | Makes the deterministic layer deterministic, idempotent, and property-testable; isolates the only network dependency. |
 | Risk_Score is a pure function of findings; Severity_Tier is derived from the score (never the reverse) | Satisfies "score derived from findings, not manually adjusted to fit a tier." |
 | AI returns structured JSON findings + recommended steps, not free prose | Lets findings feed the same scoring and rendering pipeline as deterministic findings and keeps evidence itemized. |
@@ -36,7 +36,7 @@ This design covers the MVP only: the message-and-URL scanner. Contract/lease PDF
 └───────────────▲──────────────────────┬───────────────────┘
                 │ JSON response        │ POST { input }
 ┌───────────────┴──────────────────────▼───────────────────┐
-│  API Layer  app/api/scan/route.ts  (Edge Runtime)         │
+│  API Layer  app/api/scan/route.ts  (Node.js runtime)      │
 │  Validates input → orchestrates pipeline → returns result │
 └───────────────▲──────────────────────┬───────────────────┘
                 │                      │
@@ -63,7 +63,7 @@ This design covers the MVP only: the message-and-URL scanner. Contract/lease PDF
 ```mermaid
 sequenceDiagram
     participant U as Browser (scan page)
-    participant A as /api/scan (Edge)
+    participant A as /api/scan (Node.js)
     participant D as Deterministic Engine (pure)
     participant AI as AI Engine (external LLM)
     participant S as Scoring + Report
@@ -89,17 +89,31 @@ sequenceDiagram
 
 - **Framework:** Next.js App Router, TypeScript strict mode.
 - **Styling:** Tailwind CSS with the Scryvorn theme tokens.
-- **Runtime:** Edge Runtime for `/api/scan`; static/client rendering for the page.
+- **Runtime:** standard Next.js App Router Node.js runtime for `/api/scan` (deployed as a Netlify synchronous function); static/client rendering for the page.
 - **AI:** OpenAI-compatible Chat Completions API (base URL, key, model configurable), called with `fetch` + `AbortController` (30 s timeout).
 - **Domain-age (optional):** configurable HTTP lookup service returning registration age in days.
-- **Deployment:** Cloudflare Pages via `@cloudflare/next-on-pages`.
+- **Deployment:** Netlify via its built-in Next.js support (OpenNext adapter, automatic; not pinned). No plugin or `netlify.toml` is required for the integration.
 - **Testing:** Vitest (unit/integration), React Testing Library (components), `fast-check` (property-based tests).
 
 ### Deployment Topology
 
-> **Required decision before Task 6: deployment target.** Netlify is now the current deployment target. This design, Req 11.1, steering `tech.md`, Task 6.1 (Edge Runtime route), `package.json` (`pages:build`, `@cloudflare/next-on-pages`), and `wrangler.toml` still describe Cloudflare Pages. Before Task 6, these must be reconciled with approval: the route runtime (Netlify Functions/Node or Edge), how server environment variables are read, the build command, and the Req 11.1 compliance criteria. Task 5 makes no deployment, runtime, or package changes. The Cloudflare text below is kept until that decision is recorded.
+**Decision: Netlify, standard Node.js runtime.** Scryvorn deploys to Netlify. Netlify's built-in Next.js support (the OpenNext adapter, applied automatically and not pinned) turns the App Router route handler into a Netlify serverless function. The scan route is the only server-side surface. It uses the standard Next.js App Router Node.js runtime (the default) and does not use the Edge Runtime. The rest of the app is statically prerendered or client-rendered. No database, auth, analytics, or server-side logging of user data is present.
 
-The scan route is the only server-side surface and runs on the Edge Runtime; the rest of the app is statically prerendered or client-rendered. Secrets (`AI_API_KEY`, `AI_API_BASE_URL`, `AI_MODEL`, optional `DOMAIN_AGE_API_URL`, `DOMAIN_AGE_API_KEY`) are bound as Cloudflare environment variables / secrets and loaded from `.env.local` in development. No database, auth, analytics, or server-side logging of user data is present. Full WCAG validation, responsive checks, and Cloudflare build success are covered in the Testing Strategy.
+**Execution limit.** Netlify's synchronous function execution limit is **60 seconds and is not configurable**. Next.js `maxDuration` cannot raise it, and it is not relied on. `AI_TIMEOUT_MS` stays at 30,000 ms. This is not claimed to leave a proven safety margin: cold start, network latency to the AI provider, and any future domain-age lookups are unmeasured. The 60-second limit is not treated as a safe operating budget until a deploy-preview request has been measured. Async work still running after a response (for example, an abandoned domain-age lookup) can continue until the limit.
+
+**Secrets and environment.** Server secrets (`AI_API_KEY`, `AI_API_BASE_URL`, `AI_MODEL`, and the optional `DOMAIN_AGE_API_URL` and `DOMAIN_AGE_API_KEY`) are set as Netlify environment variables through the UI, CLI, or API, and read with `process.env` at request time. They must be available to functions. On plans with variable scopes, their scope must include Functions. They must not be declared in `netlify.toml`: variables declared there are not available to functions. Values apply per deploy, so a change takes effect only after a redeploy. In development they load from `.env.local`.
+
+**Node.js version.** Netlify functions run on the build's Node.js version if it is a valid AWS Lambda runtime; otherwise they fall back to Node.js 24. Which LTS version to pin, through `.nvmrc` or `NODE_VERSION`, is an open decision for the executable reconciliation. The local development version (Node 26) may differ from production.
+
+**Pre-deployment checks (required before treating a deployment as verified).**
+1. Confirm the first Netlify deploy auto-detects the build command and publish directory without a `netlify.toml`.
+2. Confirm the route handler runs as a Netlify function, and that non-POST requests to `/api/scan` return 405.
+3. Confirm how environment variables reach functions on the actual Netlify plan, especially whether Functions scoping is available.
+4. Measure a deploy-preview scan request (cold and warm, AI enabled) before treating the 60-second limit as a safe operating budget.
+
+**Transition: Cloudflare configuration still present.** `package.json` (`pages:build`, `@cloudflare/next-on-pages`), `.npmrc` (`legacy-peer-deps`, needed only for that package), `wrangler.toml`, and the Cloudflare entries in `.gitignore` remain until a separate, approved executable change removes them. They are not used for the Netlify deployment.
+
+Full WCAG validation, responsive checks, and Netlify build success are covered in the Testing Strategy.
 
 ## Components and Interfaces
 
@@ -109,7 +123,7 @@ The scan route is the only server-side surface and runs on the Edge Runtime; the
 app/
   layout.tsx                  root layout, theme, fonts, advisory disclaimer shell
   page.tsx                    single page: scanner + roadmap section
-  api/scan/route.ts           POST handler (Edge Runtime), pipeline orchestration
+  api/scan/route.ts           POST handler (Node.js runtime), pipeline orchestration
 components/
   theme/
     Header.tsx                Moonlit Midnight header w/ decorative crescent-moon/bat motif (aria-hidden)
@@ -141,6 +155,7 @@ lib/
   ai/
     types.ts                  AiFinding, AiOutcome
     prompt.ts                 buildAiPrompt(input, deterministicSummary): string
+    deterministicSummary.ts   buildDeterministicSummary(det: DeterministicResult): string (Task 6; caps need approval)
     aiInterpretation.ts       runAiInterpretation(input, summary, opts?: {timeoutMs?: number}): Promise<AiOutcome> (server-side only)
   scoring/
     riskScore.ts              computeRiskScore(det, ai): number; severityTierForScore(score)
@@ -162,21 +177,43 @@ LICENSE                      MIT
 
 ### Interface Contracts
 
-**Scan API route — `POST /api/scan` (Edge Runtime)**
+**Scan API route — `POST /api/scan` (Node.js runtime)**
 
 ```ts
-// Request
+// Request (POST only; standard Next.js App Router Node.js runtime, no Edge Runtime)
 POST /api/scan
 Content-Type: application/json
 { "input": string }
 
-// Validation (synchronous):
-//   - 400 JSON { "error": "input_required" | "input_too_long" } if empty-after-trim or length > 10_000
-
-// Success response: application/json, single JSON body
-//   200 ScanResult  (full result; see Data Models)
-//   400 { "error": "input_required" | "input_too_long" }
+// Responses: application/json, single JSON body, header Cache-Control: no-store
+//   200 ScanResult                       (complete or incomplete variant; see Data Models)
+//   400 { "error": "invalid_request" }   malformed JSON, Content-Type not application/json,
+//                                        body not an object, or `input` missing or not a string
+//   400 { "error": "input_required" }    `input` is empty after trimming
+//   400 { "error": "input_too_long" }    `input` is longer than INPUT_MAX_CHARS (10,000)
+//   500 { "error": "internal_error" }    any unexpected failure (including InvalidFindingWeightError)
+//   405                                  non-POST methods (framework default; to be confirmed, see
+//                                        "Deployment Topology" pre-deployment checks)
 ```
+
+**Validation order.** Content type, then JSON parse, then the shape of `input`, then empty-after-trim, then length. Only `input` is read from the body. Any other client-supplied fields, including findings, weights, scores, or tiers, are ignored and never scored. All findings are generated server-side.
+
+**200 response fields.** `timestamp` (ISO 8601 UTC, set by the route), `inputType` (set by the route from whether URLs were found), `deterministicStatus`, `incompleteChecks`, `riskScore`, `severityTier`, `waxSealColor`, `deterministicFindings`, `aiFindings`, `recommendedSteps`, `aiAvailable`, `aiUnavailableReason` (present only when `aiAvailable` is false), `lookalikeCheckActive`, `domainAgeAvailable`, and `disclaimer`. Every field except `timestamp` and `inputType` comes from `assessScan`; the route does not reconstruct the completion rule. For an incomplete run, `riskScore`, `severityTier`, and `waxSealColor` are `null`.
+
+**Pipeline order.**
+1. Run the deterministic checks to completion.
+2. Build the `deterministicSummary`.
+3. Run AI interpretation.
+4. Combine the results with `assessScan`.
+
+**Decision: AI runs even after an incomplete deterministic run.** AI interpretation still runs when `deterministicStatus` is `"incomplete"`. `assessScan` still returns the incomplete variant, with `riskScore`, `severityTier`, and `waxSealColor` all `null`, and keeps the collected deterministic findings and any AI findings. No new `"skipped"` value is added to `aiUnavailableReason`; it stays `"timeout" | "error"`.
+
+**Privacy.**
+- Nothing is logged from user input, URLs, findings, AI output, or results, on any path, including errors.
+- Error bodies are fixed strings that never echo the request.
+- Every response carries `Cache-Control: no-store`.
+
+**Timing.** The route runs as a Netlify synchronous function, limited to 60 seconds; the limit is not configurable (see "Deployment Topology"). `AI_TIMEOUT_MS` stays 30,000 ms, and no safety margin is claimed until a deploy-preview request has been measured.
 
 Client-side validation prevents submitting empty input (no call is made); the server re-validates as defense-in-depth. The client sends one `POST` with the input and renders the result from the single JSON response. While the request is in flight the UI shows a simple loading indicator; on the `200` response the Verified Checks, AI Interpretation, Wax-Seal verdict, and report-export controls are rendered and the Copy/Download buttons become enabled. On a `400` the inline validation message is shown; on any other non-200 response a generic error state is shown.
 
@@ -218,7 +255,14 @@ export async function runDeterministicChecks(
 
 The engine calls the pure check functions (`extractUrls`, `checkHttps`, `detectShortener`, `domainHeuristic`, `detectScamTriggers`) in a fixed order, then the optional `domainAgeLookup`. On any lookup failure/unconfiguration it appends an informational "domain-age data unavailable" finding rather than aborting.
 
-**Domain-age lookup timing.** Lookups run sequentially, once per unique parsed hostname in first-seen order. Each lookup waits at most `domainAgeTimeoutMs` (default 5,000 ms, `DOMAIN_AGE_TIMEOUT_MS` in `lib/checks/domainAgeLookup.ts`) and is then treated as failed. The timeout limits waiting only: it does not cancel the injected service, which may keep running in the background, because the lookup function signature has no abort signal. There is currently no overall time budget and no limit on how many hostnames are looked up, so total time grows with the number of unique hostnames in the input. **Before a production domain-age service is enabled**, an overall lookup budget or a bounded lookup policy (for example, a hostname-count limit) must be designed and approved. No such limit is set yet.
+**Domain-age lookup timing.** Lookups run sequentially, once per unique parsed hostname in first-seen order. Each lookup waits at most `domainAgeTimeoutMs` (default 5,000 ms, `DOMAIN_AGE_TIMEOUT_MS` in `lib/checks/domainAgeLookup.ts`) and is then treated as failed. The timeout limits waiting only: it does not cancel the injected service, which may keep running in the background, because the lookup function signature has no abort signal. There is currently no overall time budget and no limit on how many hostnames are looked up, so total time grows with the number of unique hostnames in the input. On Netlify, all of this falls inside the same 60-second function limit as the 30-second AI call.
+
+**Gate: no production domain-age service until an approved bounded policy exists (Req 11.10).** No final numbers are set. The policy must answer these open questions, each needing approval:
+1. **Maximum lookups per scan:** how many unique hostnames, in first-seen order, are looked up per scan.
+2. **Per-lookup timeout:** whether the current 5,000 ms default stays or is lowered.
+3. **Overall lookup budget:** a total time limit for the domain-age stage, chosen so that it plus the AI timeout and measured overhead fits within the 60-second function limit.
+4. **Behavior when the budget or lookup cap is reached:** for example, stop new lookups and add one informational note naming the skipped hostnames, while the run stays `complete`. The exact behavior and wording need approval.
+5. **`AbortSignal` support:** extend the injected lookup contract so a timeout can cancel the service instead of only stopping the wait.
 
 **AI engine**
 
@@ -237,6 +281,24 @@ export function buildAiPrompt(input: string, deterministicSummary: string): stri
 ```
 
 **Prompt.** The prompt instructs the model to: return exactly one JSON object `{ findings: [{category,label,evidence,severity}], recommendedSteps: [] }` with no markdown, code fences, or extra keys; only report observations supported by the submitted message (empty array if none); never claim the input, sender, or any link is safe and never use "Verified Safe"; use `severity` only as confidence (`low|medium|high`), not proof of fraud; and never fetch, visit, or verify URLs. Both arguments are untrusted: each is embedded after the rules as a JSON string literal (`JSON.stringify`), so quotes and line breaks are escaped, and the model is told to ignore any instructions inside them. The whole prompt is sent as a single `user` message.
+
+**Deterministic summary (contract for Task 6).**
+
+```ts
+// lib/ai/deterministicSummary.ts (pure; no network, no environment access)
+export const DETERMINISTIC_SUMMARY_MAX_FINDINGS: number; // VALUE REQUIRES APPROVAL
+export const DETERMINISTIC_SUMMARY_MAX_LINE_CHARS: number; // VALUE REQUIRES APPROVAL
+export const DETERMINISTIC_SUMMARY_MAX_TOTAL_CHARS: number; // VALUE REQUIRES APPROVAL
+export function buildDeterministicSummary(det: DeterministicResult): string;
+```
+
+- **Format:** plain text, one item per line, in a fixed order.
+- **First line:** the deterministic status and any unfinished required checks, using fixed wording and check names only. For example, `status: complete` or `status: incomplete; unfinished: domain_heuristic, scam_triggers`.
+- **Then one line per deterministic finding, in engine order:** `category`, `label`, and the relevant `hostname` (parsed from `url`, for URL-based findings) or `matchedText` (for scam-trigger findings), whichever applies. Example shape: `- shortener | URL shortener | host: bit.ly`.
+- **Excluded:** weights, the risk score, severity tiers, and wax-seal colors, so the model cannot anchor on them. Also excluded is anything client-supplied: the summary is built only from engine output, never from request fields other than the scanned `input`.
+- **Untrusted content:** labels, hostnames, and matched text are user-derived. The summary stays untrusted, `buildAiPrompt` embeds it as escaped data as it does now, and it is never logged.
+- **Caps:** the three named constants bound the number of finding lines, the length of each line, and the total length. If any cap truncates, a final fixed line says so (for example, `- (N more findings omitted)`). Their values must be conservative and **require approval** before Task 6 is implemented; no values are selected here.
+- **Deterministic:** the same `DeterministicResult` always produces the same summary.
 
 **Timeout.** `timeoutMs` is an optional numeric override (finite and > 0; otherwise the outcome is `error` with no request). One timer covers both the request and reading the response body. When it fires, the request is aborted through `AbortController` and the outcome is `reason: "timeout"`; every other failure is `reason: "error"`. The timer is cleared on every exit path.
 
@@ -551,7 +613,10 @@ For Scryvorn's pure logic layer, a small, high-value set of property-based tests
 | Copy-to-clipboard fails | UI shows an "export failed" notice; the Evidence_Report is preserved so the user can retry. | 9.6 |
 | Download fails | UI shows an "export failed" notice; the Evidence_Report is preserved for retry. | 9.6 |
 | Network error on the scan POST | UI shows an error state; no scan result is rendered; the user can retry; no fabricated AI findings. | 2.8 |
-| Unexpected server error | A generic, sanitized error response is returned (no user input or results echoed); the UI shows a generic error state. | 8.4, 8.5 |
+| Malformed request (invalid JSON, wrong Content-Type, non-object body, missing or non-string `input`) | Server returns 400 `{ "error": "invalid_request" }` with `Cache-Control: no-store`; nothing from the request is echoed or logged. | 8.4, 8.5 |
+| Input longer than `INPUT_MAX_CHARS` reaching the server | Server returns 400 `{ "error": "input_too_long" }` (defense-in-depth behind the client limit). | 1.6 |
+| Non-POST request to `/api/scan` | 405 (framework default; to be confirmed on the first Netlify deploy). | — |
+| Unexpected server error | Server returns 500 `{ "error": "internal_error" }` (fixed body; no user input or results echoed; nothing logged); the UI shows a generic error state. | 8.4, 8.5 |
 
 **No-data-leak invariant:** No error path, log statement, or analytics call may include user-supplied message text, URLs, or scan results. The scan route contains no logging of request bodies; any operational logging uses static, sanitized messages. Inputs and results live only in React component state for the page session and are cleared on navigation/refresh; nothing is written to `localStorage`, IndexedDB, files, databases, or third-party services.
 
@@ -593,7 +658,7 @@ Generators should cover edge cases relevant to this suite: URLs with/without sch
 - `.env.example` exists and lists every required env var with clearly-placeholder values (Req 11.5); `.gitignore` includes `.env.local` (Req 11.6); `.kiro/specs`, `.kiro/steering`, `.kiro/hooks` remain tracked (steering).
 - No literal secrets in committed source (secret-pattern scan) (Req 11.3); `LICENSE` contains MIT text (Req 11.4).
 - No contract-PDF / bank-statement / subscription-drain modules exist; build succeeds without them (Req 10.3).
-- Cloudflare Pages build succeeds using only committed files and environment variables (Req 11.1, 11.2) — verified in CI via the `@cloudflare/next-on-pages` build command.
+- Netlify build succeeds using only committed files and environment variables (Req 11.1, 11.2): `next build` passes locally and in a Netlify deploy preview. The pre-deployment checks in "Deployment Topology" are completed.
 
 ### Manual / Visual Verification
 

@@ -28,4 +28,6 @@ inclusion: always
 - Use `.env.local` for local secrets and provide `.env.example` with placeholder values.
 - Public repository must include an MIT license.
 - Include three one-click sample buttons: “Fake Remote Job DM,” “Phishing Payment Link,” and “Legitimate Bank Alert.”
-- Ensure the app is deployable to Cloudflare Pages and does not depend on local-only files or uncommitted secrets.
+- Ensure the app is deployable to Netlify and does not depend on local-only files or uncommitted secrets.
+- Run the scan API route on the standard Next.js Node.js runtime; do not use the Edge Runtime.
+- Set production secrets as Netlify environment variables available to functions, never in `netlify.toml`.
