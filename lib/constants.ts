@@ -60,3 +60,15 @@ export const SEVERITY_TIERS: ReadonlyArray<{
 
 export const ADVISORY_DISCLAIMER =
   "Scryvorn provides risk signals and verification guidance, not financial, legal, or law-enforcement advice. Always verify independently.";
+
+/**
+ * Reviewed fallback verification steps, used when AI is unavailable or
+ * returns no steps. These are recommendations for the user to carry out,
+ * not checks Scryvorn performed.
+ */
+export const FALLBACK_VERIFICATION_STEPS: readonly string[] = Object.freeze([
+  "Verify the sender through an independently obtained contact method.",
+  "Open the organization's official app or independently locate its official website instead of using the submitted link.",
+  "Do not share passwords, one-time codes, or recovery phrases.",
+  "Pause before sending money or acting on urgent requests.",
+]);

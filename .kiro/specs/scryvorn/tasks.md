@@ -114,8 +114,8 @@ The implementation follows the layered architecture from the design: pure determ
     - Analyze URL structure and metadata only; never fetch, crawl, render, screenshot, or download content from user-supplied URLs
     - _Requirements: 3.1, 4.1, 4.5, 4.6, 4.7, 4.9, 4.10, 4.11_
 
-- [ ] 4. Implement AI interpretation engine
-  - [ ] 4.1 Implement AI prompt builder
+- [x] 4. Implement AI interpretation engine
+  - [x] 4.1 Implement AI prompt builder
     - Create `lib/ai/prompt.ts` with `buildAiPrompt(input: string, deterministicSummary: string): string`
     - Instruct model to return JSON `{ findings: [{category, label, evidence, severity}], recommendedSteps: [] }`
     - Instruct model to only report findings supported by the input (empty array if none)
@@ -123,37 +123,44 @@ The implementation follows the layered architecture from the design: pure determ
     - Instruct model to base `severity` on confidence (`low`, `medium`, `high`)
     - _Requirements: 3.3, 6.6_
 
-  - [ ] 4.2 Implement AI interpretation engine with timeout
-    - Create `lib/ai/aiInterpretation.ts` with `runAiInterpretation(input: string, deterministicSummary: string, opts: { timeoutMs: 30000 }): Promise<AiOutcome>`
-    - Use `AbortController` with configurable timeout (default 30000 ms)
+  - [x] 4.2 Implement AI interpretation engine with timeout
+    - Create `lib/ai/aiInterpretation.ts` with `runAiInterpretation(input: string, deterministicSummary: string, opts?: { timeoutMs?: number }): Promise<AiOutcome>`
+    - Use `AbortController` with an optional numeric timeout override (default `AI_TIMEOUT_MS`, 30000 ms) covering both the request and response-body reading; clear the timer on every exit path
     - Call OpenAI-compatible Chat Completions API via `fetch` using `AI_API_KEY`, `AI_API_BASE_URL`, `AI_MODEL` from environment variables
     - Parse structured JSON response; treat malformed JSON as an error
     - Return `{ unavailable: true, reason: "timeout" }` on timeout, `{ unavailable: true, reason: "error" }` on error or malformed response
     - Return `{ unavailable: false, findings, recommendedSteps }` on success
     - _Requirements: 3.3, 3.4, 3.7_
 
-- [ ] 5. Implement scoring and evidence report generation
-  - [ ] 5.1 Implement risk score computation and severity tier mapping
+- [x] 5. Implement scoring and evidence report generation
+  - [x] 5.1 Implement risk score computation and severity tier mapping
     - Create `lib/scoring/riskScore.ts` with `computeRiskScore(det: DeterministicFinding[], ai: AiFinding[]): number`
-    - Sum configured per-finding weights from `SCORING_WEIGHTS`; cap total scam-trigger contribution at `scam_trigger_max_total`
+    - Sum the weights assigned by the trusted internal finding producers (which take them from `SCORING_WEIGHTS`); cap total scam-trigger contribution at `scam_trigger_max_total` only for deterministic findings whose `check` is `scam_triggers`
+    - Throw `InvalidFindingWeightError` for any non-finite or negative weight; document that these are internal contracts, not an API for client-supplied findings or weights
     - Clamp to `[0, 100]` and round to integer; identical findings always yield identical score
+    - Keep other deterministic and AI contributions additive with no cross-engine dedup, and add tests that make this explicit (AI alone and repeated shortened URLs can reach the highest tier); document the score as an uncalibrated heuristic (Req 6.10)
+    - Create `lib/scoring/assessment.ts` with `assessScan(det: DeterministicResult, ai: AiOutcome)`: the shared completion rule producing the discriminated `ScanResult` fields (incomplete → `riskScore`, `severityTier`, `waxSealColor` all `null`), ignoring AI findings when AI is unavailable, and using `FALLBACK_VERIFICATION_STEPS` when AI is unavailable or returns no steps
     - Create `severityTierForScore(score: number): { tier: SeverityTier; color: string }`
     - Map score ranges: 0–39 to "Low risk — still verify independently" (Potion Emerald #059669), 40–69 to "Caution — verify before acting" (Candlelight Gold #D97706), 70–100 to "TRAP DETECTED" (Crimson Wax #DC2626)
     - Tier derives strictly from score, never the reverse
     - Never present a deterministic result with `status: "incomplete"` as a completed "Low risk — still verify independently" assessment (Req 6.9)
-    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.8, 6.9_
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.8, 6.9, 6.10_
 
   - [ ]* 5.2 Write property test for risk-score boundary mapping
     - **Property 5: Risk-score boundaries map to the correct severity tier**
     - **Validates: Requirements 6.1, 6.2, 6.3, 6.4, 6.5**
 
-  - [ ] 5.3 Implement evidence report builder
+  - [x] 5.3 Implement evidence report builder
     - Create `lib/report/evidenceReport.ts` with `buildEvidenceReport(result: ScanResult): string` producing Markdown
     - Include scan timestamp, input type, Risk_Score, Severity_Tier, deterministic findings, AI findings, recommended verification steps, and advisory disclaimer
     - When AI is unavailable, include deterministic findings and explicit "AI analysis unavailable" notice; still generate the report
     - Create `reportFilename(timestamp: string): string` returning `scryvorn-report-YYYYMMDD-HHmmss.md`
-    - When the deterministic run is incomplete, state that the checks did not complete and list the unfinished checks; do not present the report as a completed assessment (Req 6.9)
-    - _Requirements: 6.9, 9.2, 9.3, 9.4_
+    - When the deterministic run is incomplete, state "Assessment incomplete — no overall risk score or tier assigned.", list the unfinished checks, and keep the collected evidence; do not present the report as a completed assessment (Req 6.9)
+    - Use the seven report sections from Req 9.7 (no "Verified Checks" heading); state the exact inactive-lookalike sentence (Req 9.8); put HTTPS/TLD findings under "Informational context" and domain-age unavailability under "Checks not performed / unavailable"; when AI is unavailable, ignore supplied AI findings and show "AI analysis unavailable"
+    - Escape Markdown/HTML and defang URLs/domains in all untrusted report content via `lib/report/safeMarkdown.ts`, without changing the findings in memory (Req 9.9)
+    - Require an ISO 8601 timestamp with `Z` or a numeric offset; throw `InvalidTimestampError` otherwise; render and name the file in UTC (Req 9.10)
+    - Label steps as recommendations; use fallback steps when none are supplied; never claim a destination was visited or confirmed (Req 9.11)
+    - _Requirements: 6.9, 6.10, 9.2, 9.3, 9.4, 9.7, 9.8, 9.9, 9.10, 9.11_
 
   - [ ]* 5.4 Write property test for evidence report with AI unavailable
     - **Property 6: Evidence report is complete and timestamped when AI is unavailable**
@@ -168,7 +175,9 @@ The implementation follows the layered architecture from the design: pure determ
     - Derive `inputType` from whether URLs were found in the input
     - Return 200 with full `ScanResult` JSON (timestamp, inputType, riskScore, severityTier, waxSealColor, deterministicFindings, aiFindings, recommendedSteps, aiAvailable, aiUnavailableReason, disclaimer)
     - No logging of user input, URLs, or scan results; return sanitized error responses on unexpected errors without echoing user data
-    - Carry the deterministic `status` and `incompleteChecks` through to the response; an incomplete run must not be returned as a completed "Low risk" assessment (Req 6.9)
+    - Build the response with `assessScan` (do not reconstruct the completion rule); an incomplete run must not be returned as a completed "Low risk" assessment (Req 6.9)
+    - Generate all findings server-side; never score findings or weights supplied by the client
+    - Before starting Task 6: reconcile the Cloudflare-to-Netlify deployment target across steering, Req 11.1, design, this task's runtime choice, `package.json`, and `wrangler.toml` (required decision; see design "Deployment Topology")
     - Before enabling a production domain-age service, define an approved overall lookup budget or bounded lookup policy
     - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 6.8, 6.9, 8.2, 8.4, 8.5, 11.1_
 

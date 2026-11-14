@@ -97,6 +97,8 @@ sequenceDiagram
 
 ### Deployment Topology
 
+> **Required decision before Task 6: deployment target.** Netlify is now the current deployment target. This design, Req 11.1, steering `tech.md`, Task 6.1 (Edge Runtime route), `package.json` (`pages:build`, `@cloudflare/next-on-pages`), and `wrangler.toml` still describe Cloudflare Pages. Before Task 6, these must be reconciled with approval: the route runtime (Netlify Functions/Node or Edge), how server environment variables are read, the build command, and the Req 11.1 compliance criteria. Task 5 makes no deployment, runtime, or package changes. The Cloudflare text below is kept until that decision is recorded.
+
 The scan route is the only server-side surface and runs on the Edge Runtime; the rest of the app is statically prerendered or client-rendered. Secrets (`AI_API_KEY`, `AI_API_BASE_URL`, `AI_MODEL`, optional `DOMAIN_AGE_API_URL`, `DOMAIN_AGE_API_KEY`) are bound as Cloudflare environment variables / secrets and loaded from `.env.local` in development. No database, auth, analytics, or server-side logging of user data is present. Full WCAG validation, responsive checks, and Cloudflare build success are covered in the Testing Strategy.
 
 ## Components and Interfaces
@@ -137,13 +139,15 @@ lib/
     domainAgeLookup.ts        lookupDomainAge(domain, service?): Promise<DeterministicFinding|null>
     deterministicEngine.ts    runDeterministicChecks(input, opts?): Promise<DeterministicResult>
   ai/
-    types.ts                  AiFinding, AiResult
+    types.ts                  AiFinding, AiOutcome
     prompt.ts                 buildAiPrompt(input, deterministicSummary): string
-    aiInterpretation.ts       runAiInterpretation(input, summary, {timeoutMs}): Promise<AiResult|Unavailable>
+    aiInterpretation.ts       runAiInterpretation(input, summary, opts?: {timeoutMs?: number}): Promise<AiOutcome> (server-side only)
   scoring/
     riskScore.ts              computeRiskScore(det, ai): number; severityTierForScore(score)
+    assessment.ts             assessScan(det: DeterministicResult, ai: AiOutcome): ScanAssessment (shared completion rule)
   report/
     evidenceReport.ts         buildEvidenceReport(result): string; reportFilename(timestamp): string
+    safeMarkdown.ts           toSafeMarkdownText(untrusted): string (escape + defang)
   samples/
     sampleTraps.ts            three synthetic sample strings (fictional data only)
 data/
@@ -204,7 +208,7 @@ export async function runDeterministicChecks(
 
 **Completion status.** Required checks are `url_extraction`, `https_status`, `shortener`, `domain_heuristic`, and `scam_triggers`. A required check counts as finished only after it has run over the whole input (per-URL checks: after the last URL). If an unexpected internal failure interrupts them, the engine keeps the findings collected so far, sets `status: "incomplete"`, and lists the unfinished required checks in `incompleteChecks`. No exception text or user input is recorded in this metadata. When a run is incomplete, the optional domain-age stage is skipped (no lookup, no note, `domainAgeAvailable: false`). Individual checks do not swallow unexpected internal errors (they still return no finding for unparseable URLs), so a failure surfaces as an incomplete run instead of a normal-looking empty result. Two expected states are NOT failures and leave `status: "complete"`: an absent or empty legitimate-domain list (lookalike check inactive), and an unconfigured or failing optional domain-age lookup (informational fallback note).
 
-**Downstream requirement (Req 6.9).** Scoring, report, API, and UI tasks must not present an incomplete deterministic run as a completed assessment. In particular, a Risk_Score computed from partial findings must not be shown as "Low risk — still verify independently", and the Evidence_Report and UI must state that the deterministic checks did not complete and name the unfinished checks.
+**Downstream requirement (Req 6.9).** Scoring, report, API, and UI tasks must not present an incomplete deterministic run as a completed assessment. `assessScan` (see Scoring) gives an incomplete run `riskScore`, `severityTier`, and `waxSealColor` of `null`; no score is computed from partial findings and no tier is substituted. The Evidence_Report and UI must state "Assessment incomplete — no overall risk score or tier assigned.", name the unfinished checks, and keep the collected evidence.
 
 **Lookalike detection and the known-legitimate-domain list.** No production reference list of legitimate domains exists, and none is invented or bundled. `domainHeuristic(url, tldList, legitimateDomains?)` takes the list as an optional injected argument. With an empty or absent list, lookalike checking is INACTIVE and produces no lookalike findings; this means the check was not performed, NOT that the domain passed. A reviewed, versioned list (same shape as the other `/data` files: `version`, `source`, `date`, `domains`) can be supplied later and injected by the scan route. Matching compares the parsed hostname's last two labels only (never path or query substrings), using conservative rules (character substitution, single omission, typosquatting). Low-confidence matches are labeled "Needs manual verification" and set `needsManualVerification=true`; the finding never asserts impersonation. The engine performs no network requests by default.
 
@@ -226,11 +230,21 @@ export type AiOutcome =
 export async function runAiInterpretation(
   input: string,
   deterministicSummary: string,
-  opts: { timeoutMs: 30000 }
+  opts?: { timeoutMs?: number } // default AI_TIMEOUT_MS (30,000 ms)
 ): Promise<AiOutcome>;
+
+export function buildAiPrompt(input: string, deterministicSummary: string): string;
 ```
 
-Uses `AbortController` with `timeoutMs`. The prompt instructs the model to: return JSON `{ findings: [{category,label,evidence,severity}], recommendedSteps: [] }`, only report findings supported by the input (empty array if none), never claim the input is safe or use "Verified Safe", and base `severity` on confidence (`low|medium|high`).
+**Prompt.** The prompt instructs the model to: return exactly one JSON object `{ findings: [{category,label,evidence,severity}], recommendedSteps: [] }` with no markdown, code fences, or extra keys; only report observations supported by the submitted message (empty array if none); never claim the input, sender, or any link is safe and never use "Verified Safe"; use `severity` only as confidence (`low|medium|high`), not proof of fraud; and never fetch, visit, or verify URLs. Both arguments are untrusted: each is embedded after the rules as a JSON string literal (`JSON.stringify`), so quotes and line breaks are escaped, and the model is told to ignore any instructions inside them. The whole prompt is sent as a single `user` message.
+
+**Timeout.** `timeoutMs` is an optional numeric override (finite and > 0; otherwise the outcome is `error` with no request). One timer covers both the request and reading the response body. When it fires, the request is aborted through `AbortController` and the outcome is `reason: "timeout"`; every other failure is `reason: "error"`. The timer is cleared on every exit path.
+
+**Configuration and endpoint.** Server-side only, by convention: only the scan route imports `lib/ai/aiInterpretation.ts`. It reads `AI_API_KEY`, `AI_API_BASE_URL`, and `AI_MODEL` from `process.env` at call time (they are not `NEXT_PUBLIC_` variables, so they are never inlined into client bundles), and it returns `error` without reading them if called where `window` exists. If any is missing or blank, it returns `error` without a request. The endpoint is `AI_API_BASE_URL` with trailing slashes removed plus `/chat/completions`, so the base URL includes the version path (`https://api.example.com/v1` → `https://api.example.com/v1/chat/completions`). The base URL must be `https`, or `http` only for `localhost`, `127.0.0.1`, or `[::1]`, with no query, fragment, or credentials; otherwise it is treated as missing configuration.
+
+**Response validation.** A non-2xx status, a body that is not JSON, or an envelope without a string `choices[0].message.content` is `error`. The content must parse as JSON with exactly the keys `findings` and `recommendedSteps`. Each finding must have exactly `category`, `label`, `evidence` (non-blank strings) and `severity` (exactly `"low"`, `"medium"`, or `"high"`). `recommendedSteps` must be an array of non-blank strings. Anything else, including code-fenced JSON, is `error`: malformed findings are rejected, never coerced, and one invalid finding rejects the whole result. Valid findings get `id: "ai:<index>"`, `source: "ai"`, and `weight` from `SCORING_WEIGHTS.ai[severity]`; the engine does not compute the Risk_Score.
+
+**No leakage.** Unavailable outcomes are exactly `{ unavailable: true, reason }`. They never include credentials, provider error text, or submitted content, and the engine logs nothing.
 
 **Scoring**
 
@@ -239,14 +253,55 @@ export function computeRiskScore(det: DeterministicFinding[], ai: AiFinding[]): 
 export function severityTierForScore(score: number): { tier: SeverityTier; color: string };
 ```
 
-`computeRiskScore` is a pure function: it sums configured per-finding weights (see Data Models) and clamps to `[0,100]`. `severityTierForScore` maps the score to a tier and wax-seal color. The tier is derived strictly from the score.
+`computeRiskScore` is a pure, findings-only calculation. It sums the `weight` already assigned to each finding by the trusted internal producers (the deterministic checks and the AI engine), which take their weights from `SCORING_WEIGHTS`. It applies `scam_trigger_max_total` (36) only to deterministic findings whose `check` is `"scam_triggers"`, never to AI category strings, then clamps to `[0,100]` and rounds. It throws `InvalidFindingWeightError` (a `RangeError`) for any non-finite or negative weight, rather than letting a bad weight lower or corrupt the score. `severityTierForScore` maps an integer score in `[0,100]` to a tier and wax-seal color (it throws a `RangeError` otherwise). The tier is derived strictly from the score.
+
+**Internal contracts only.** These functions trust the weights on the findings they receive. They are not an API for accepting client-supplied findings or weights: the scan route must generate its own findings by running the engines server-side and must never score findings taken from a request.
+
+**Shared assessment helper.**
+
+```ts
+type ScanAssessment = Omit<ScanResult, "timestamp" | "inputType">; // distributive over the union
+export function assessScan(det: DeterministicResult, ai: AiOutcome): ScanAssessment;
+```
+
+`assessScan` is the single place that applies the completion rule (Req 6.9). Route and UI code must use it instead of rebuilding the rule:
+- The run counts as complete only if `det.status === "complete"` and `det.incompleteChecks` is empty. Then `riskScore = computeRiskScore(...)`, and `severityTier` and `waxSealColor` come from `severityTierForScore`.
+- Otherwise the result is incomplete. `riskScore`, `severityTier`, and `waxSealColor` are `null`, `incompleteChecks` lists the unfinished checks, and all collected findings are kept. No higher tier is substituted and no score is manufactured.
+- If AI is unavailable, `aiFindings` is `[]` and `aiUnavailableReason` is set. The score then uses deterministic findings alone (Req 6.8).
+- `recommendedSteps` are the AI's steps when AI is available and returned at least one. Otherwise they are `FALLBACK_VERIFICATION_STEPS`.
+- `lookalikeCheckActive`, `domainAgeAvailable`, and `disclaimer` (`ADVISORY_DISCLAIMER`) are filled in. The route adds `timestamp` and `inputType`.
 
 **Report**
 
 ```ts
 export function buildEvidenceReport(result: ScanResult): string; // Markdown
-export function reportFilename(timestamp: string): string; // scryvorn-report-YYYYMMDD-HHmmss.md
+export function reportFilename(timestamp: string): string; // scryvorn-report-YYYYMMDD-HHmmss.md (UTC)
 ```
+
+**Report sections, in order.** "Assessment status and coverage", "Scored deterministic findings", "Informational context", "Checks not performed / unavailable", "AI interpretation", "Recommended verification steps", "Advisory disclaimer". The heading "Verified Checks" is not used in the report.
+- **Assessment status and coverage.** Shows the UTC scan time, input type, and deterministic status.
+  - Complete: the Risk_Score, labeled as an uncalibrated heuristic score (not a probability or fraud verdict), and the Severity_Tier.
+  - Incomplete: "Assessment incomplete — no overall risk score or tier assigned.", the unfinished required checks, and a note that the collected evidence is still listed.
+  - Lookalike configuration: inactive → "Lookalike checking was not performed because no reviewed reference list is configured. This is not a passed check."; active → configured with a reference list, which does not by itself prove the check ran for every URL.
+- **Scored deterministic findings.** Deterministic findings with weight > 0.
+- **Informational context.** Weight-0 deterministic findings other than domain-age unavailability, such as HTTPS status and elevated-attention TLD matches.
+- **Checks not performed / unavailable.** Inactive lookalike checking, domain-age unavailability notes, required checks interrupted by an internal failure, and unavailable AI analysis.
+- **AI interpretation.** If AI is unavailable, "AI analysis unavailable"; any supplied `aiFindings` are ignored. Otherwise the AI findings, labeled as model interpretation with confidence, not verified facts.
+- **Recommended verification steps.** Labeled as recommendations for the reader to carry out. The report states that Scryvorn did not visit, open, or confirm any link or destination. If `recommendedSteps` is empty, `FALLBACK_VERIFICATION_STEPS` are used.
+- **Empty sections.** An empty section says so, and adds that this is not proof of safety where relevant.
+
+**Safe Markdown output.** Finding labels, evidence, matched text, URLs, references, AI text, steps, and the disclaimer are all untrusted report content. `toSafeMarkdownText` transforms only the output; the findings in memory are not changed. It applies these steps in order:
+1. Collapses line breaks to spaces.
+2. Replaces control and bidirectional-override characters with U+FFFD.
+3. Defangs URL schemes (`https://` → `hxxps://`, `http://` → `hxxp://`, `://` → `[://]` for other schemes).
+4. Defangs domain dots (an ASCII or full-width/ideographic dot between a name character and a letter becomes `[.]`).
+5. Backslash-escapes Markdown and HTML punctuation (``\ ` * _ { } [ ] ( ) # + - . ! | < > ~ &``).
+
+As a result the report contains no raw HTML, Markdown links, images, code fences, or autolinks taken from untrusted content. Some viewers auto-link text heuristically, so the absence of automatic linking cannot be guaranteed in every Markdown viewer.
+
+**Timestamps.** The scan timestamp must be ISO 8601 `YYYY-MM-DDTHH:mm[:ss[.fraction]]` with `Z` or a numeric offset (`±HH:MM` or `±HHMM`), and must be a real calendar date and time. Otherwise `buildEvidenceReport` and `reportFilename` throw `InvalidTimestampError`. The error message does not include the value, and the current time is never substituted. The report shows the time converted to UTC, and the filename uses UTC: `scryvorn-report-YYYYMMDD-HHmmss.md`.
+
+**Score limitations (uncalibrated, for this milestone).** Apart from the scam-trigger cap, deterministic contributions are additive. AI contributions are additive. Overlap between the two engines (for example, deterministic and AI `credential_request`) is not deduplicated. AI findings alone can currently reach "TRAP DETECTED" (four high-confidence findings = 100), and repeated distinct shortened URLs can too (5 × 15 = 75). The Risk_Score is an uncalibrated heuristic: not a probability, a verified fraud verdict, or a validated confidence estimate. No further caps are set yet.
 
 ### UI Components
 
@@ -300,19 +355,37 @@ export type SeverityTier =
 
 export type InputType = "message" | "url" | "mixed";
 
-export interface ScanResult {
-  timestamp: string;                 // ISO 8601
+interface ScanResultBase {
+  timestamp: string;                 // ISO 8601 with Z or a numeric offset
   inputType: InputType;              // derived from whether URLs were found
-  riskScore: number;                 // 0..100 integer
-  severityTier: SeverityTier;
-  waxSealColor: string;              // hex for the seal
   deterministicFindings: DeterministicFinding[];
-  aiFindings: AiFinding[];
-  recommendedSteps: string[];
+  aiFindings: AiFinding[];           // always [] when aiAvailable is false
+  recommendedSteps: string[];        // AI steps, or FALLBACK_VERIFICATION_STEPS
   aiAvailable: boolean;
   aiUnavailableReason?: "timeout" | "error";
-  disclaimer: string;               // advisory disclaimer text
+  lookalikeCheckActive: boolean;     // configuration, not execution
+  domainAgeAvailable: boolean;
+  disclaimer: string;                // advisory disclaimer text
 }
+
+// Discriminated on deterministicStatus (Req 6.9).
+export interface CompleteScanResult extends ScanResultBase {
+  deterministicStatus: "complete";
+  incompleteChecks: [];
+  riskScore: number;                 // 0..100 integer, uncalibrated heuristic
+  severityTier: SeverityTier;
+  waxSealColor: string;              // hex for the seal
+}
+
+export interface IncompleteScanResult extends ScanResultBase {
+  deterministicStatus: "incomplete";
+  incompleteChecks: CheckName[];     // unfinished required checks
+  riskScore: null;                   // no score is manufactured
+  severityTier: null;                // no tier is substituted
+  waxSealColor: null;
+}
+
+export type ScanResult = CompleteScanResult | IncompleteScanResult;
 ```
 
 ```ts
@@ -401,6 +474,14 @@ export const INPUT_MAX_CHARS = 10_000;
 export const AI_TIMEOUT_MS = 30_000;
 export const ADVISORY_DISCLAIMER =
   "Scryvorn provides risk signals and verification guidance, not financial, legal, or law-enforcement advice. Always verify independently.";
+
+// Reviewed fallback steps: used when AI is unavailable or returns no steps (Req 9.11).
+export const FALLBACK_VERIFICATION_STEPS = [
+  "Verify the sender through an independently obtained contact method.",
+  "Open the organization's official app or independently locate its official website instead of using the submitted link.",
+  "Do not share passwords, one-time codes, or recovery phrases.",
+  "Pause before sending money or acting on urgent requests.",
+] as const;
 ```
 
 **Decision: elevated-attention TLDs are informational only.** Elevated-attention TLD matches are shown as informational context requiring review. They carry weight 0, do not change the Risk_Score, and cannot by themselves escalate the Severity_Tier (Req 4.13). Informational findings (weight 0: `https_status`, `elevated_attention_tld`, `domain_age_unavailable`) are kept distinct from scored risk contributions.
@@ -460,8 +541,12 @@ For Scryvorn's pure logic layer, a small, high-value set of property-based tests
 | AI timeout (>30 s) | `AbortController` aborts the request; the AI engine returns `{ unavailable, reason: "timeout" }`; scan completes with deterministic results and an "AI analysis unavailable" notice. | 3.4 |
 | AI returns an error | Same unavailable path (`reason: "error"`); deterministic findings preserved, no rollback. | 3.4 |
 | AI returns malformed JSON | Treated as an AI error (unavailable path); deterministic findings stand. | 3.4 |
+| AI returns a non-2xx status, an invalid envelope, or content not matching the exact finding/steps shape | Treated as an AI error (unavailable path); findings are never coerced or defaulted. | 3.4, 7.5 |
+| AI configuration missing or unusable | Returns the error outcome without making a request; the scan continues with deterministic results. | 3.4, 3.7 |
 | Domain-age lookup unconfigured | The lookup step is skipped entirely; an informational "domain-age data unavailable" finding is appended. | 4.6, 4.7 |
 | Domain-age lookup fails (timeout/error/unreachable) | Treated as unavailable; absence noted; scan completes. The timeout stops waiting but does not cancel the injected service. | 4.7 |
+| Finding with a non-finite or negative weight | `computeRiskScore` throws `InvalidFindingWeightError`. This is an internal-contract violation, never silently scored; the route returns its sanitized generic error. | 6.1, 6.5 |
+| Scan timestamp invalid or without `Z`/offset | `buildEvidenceReport` / `reportFilename` throw `InvalidTimestampError` (message excludes the value); the current time is never substituted. | 9.10 |
 | Unexpected internal failure in a required deterministic check | Engine keeps findings collected so far and returns `status: "incomplete"` with `incompleteChecks` (check names only, no exception text or user input); the optional domain-age stage is skipped. Downstream layers must not present the result as a completed assessment or as "Low risk — still verify independently". | 6.9 |
 | Copy-to-clipboard fails | UI shows an "export failed" notice; the Evidence_Report is preserved so the user can retry. | 9.6 |
 | Download fails | UI shows an "export failed" notice; the Evidence_Report is preserved for retry. | 9.6 |

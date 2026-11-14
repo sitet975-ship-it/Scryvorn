@@ -1,4 +1,4 @@
-﻿# Requirements Document
+# Requirements Document
 
 ## Introduction
 
@@ -116,7 +116,7 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 
 #### Acceptance Criteria
 
-1. THE Scryvorn SHALL compute a Risk_Score as an integer in the range 0 to 100 from the combined Deterministic_Check_Engine and AI_Interpretation_Engine findings.
+1. WHEN the Deterministic_Check_Engine completes its required checks, THE Scryvorn SHALL compute a Risk_Score as an integer in the range 0 to 100 from the combined Deterministic_Check_Engine and AI_Interpretation_Engine findings. (For an incomplete run, see criterion 9.)
 2. IF the Risk_Score is in the range 70 to 100, THEN THE Scryvorn SHALL assign the Severity_Tier "TRAP DETECTED" and SHALL render the Wax_Seal_Stamp as "TRAP DETECTED" in Crimson Wax (#DC2626).
 3. IF the Risk_Score is in the range 40 to 69, THEN THE Scryvorn SHALL assign the Severity_Tier "Caution — verify before acting" and SHALL render the Wax_Seal_Stamp as "Caution — verify before acting" in Candlelight Gold (#D97706).
 4. IF the Risk_Score is in the range 0 to 39, THEN THE Scryvorn SHALL assign the Severity_Tier "Low risk — still verify independently" and SHALL render the Wax_Seal_Stamp as "Low risk — still verify independently" in Potion Emerald (#059669).
@@ -124,7 +124,8 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 6. THE Scryvorn SHALL NOT render the label "Verified Safe" or any wording claiming the Scanner_Input is definitively safe.
 7. THE Scryvorn SHALL display itemized evidence supporting the Risk_Score alongside the Wax_Seal_Stamp.
 8. IF the AI_Interpretation_Engine is unavailable or returns an error, THEN THE Scryvorn SHALL compute the Risk_Score from Deterministic_Check_Engine findings alone.
-9. IF the Deterministic_Check_Engine reports that its required checks did not complete, THEN THE Scryvorn SHALL NOT present the scan as a completed assessment, SHALL NOT present it as "Low risk — still verify independently", and SHALL state in the UI and the Evidence_Report that the deterministic checks did not complete and which checks were not finished.
+9. IF the Deterministic_Check_Engine reports that its required checks did not complete, THEN THE Scryvorn SHALL NOT present the scan as a completed assessment, SHALL assign no Risk_Score, Severity_Tier, or Wax_Seal_Stamp color (it SHALL NOT substitute a higher tier or manufacture a score), SHALL state "Assessment incomplete — no overall risk score or tier assigned." in the UI and the Evidence_Report, SHALL list which required checks were not finished, and SHALL retain the evidence that was collected.
+10. THE Scryvorn SHALL describe the Risk_Score as an uncalibrated heuristic score. THE Scryvorn SHALL NOT describe it as a probability, a verified fraud verdict, or a validated confidence estimate.
 
 ### Requirement 7: Separation of Verified Checks and AI Interpretation
 
@@ -158,10 +159,15 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 
 1. WHEN a user clicks the "Copy Evidence Report" button, THE Scryvorn SHALL copy the full Evidence_Report text to the system clipboard and SHALL display a confirmation indicating the copy succeeded.
 2. WHEN a user clicks the "Download Report (.md)" button, THE Scryvorn SHALL download the Evidence_Report as a Markdown file whose filename includes the scan timestamp.
-3. THE Evidence_Report SHALL include the scan timestamp, input type, Risk_Score, Severity_Tier, deterministic findings, AI findings, recommended verification steps, and the advisory disclaimer.
-4. WHEN the AI_Interpretation_Engine is unavailable, THE Evidence_Report SHALL include the deterministic findings and an explicit "AI analysis unavailable" notice and SHALL still be generated.
+3. THE Evidence_Report SHALL include the scan timestamp, input type, Risk_Score and Severity_Tier (or, for an incomplete assessment, the incomplete notice from Requirement 6.9 in their place), deterministic findings, AI findings, recommended verification steps, and the advisory disclaimer.
+4. WHEN the AI_Interpretation_Engine is unavailable, THE Evidence_Report SHALL include the deterministic findings and an explicit "AI analysis unavailable" notice, SHALL NOT display any supplied AI findings, and SHALL still be generated.
 5. WHILE no scan has completed, THE Scryvorn SHALL NOT enable the "Copy Evidence Report" and "Download Report (.md)" buttons.
 6. IF a copy or download operation fails, THEN THE Scryvorn SHALL display an error notice indicating the export failed and SHALL preserve the Evidence_Report so the user can retry.
+7. THE Evidence_Report SHALL use these distinct sections, in order: "Assessment status and coverage", "Scored deterministic findings", "Informational context", "Checks not performed / unavailable", "AI interpretation", "Recommended verification steps", and "Advisory disclaimer". HTTPS status and elevated-attention TLD findings SHALL appear under "Informational context"; domain-age unavailability and interrupted required checks SHALL appear under "Checks not performed / unavailable". THE Evidence_Report SHALL NOT describe absent findings as proof of safety.
+8. WHILE lookalike checking is inactive, THE Evidence_Report SHALL state "Lookalike checking was not performed because no reviewed reference list is configured. This is not a passed check." WHILE a reference list is configured, THE Evidence_Report SHALL describe lookalike checking as configured, not as proof that it ran.
+9. THE Evidence_Report SHALL treat finding labels, evidence, matched text, URLs, AI text, and recommended steps as untrusted content: it SHALL escape Markdown and HTML syntax in them, SHALL defang URL and domain strings in them, and SHALL NOT emit raw HTML, Markdown links, images, or autolinks from them. Viewer-specific automatic linking cannot be guaranteed absent in every Markdown viewer.
+10. THE Evidence_Report and its filename SHALL use the scan timestamp in UTC, with the filename `scryvorn-report-YYYYMMDD-HHmmss.md`. IF the scan timestamp is not a valid ISO 8601 date-time with an explicit UTC marker or numeric offset, THEN THE Scryvorn SHALL reject it with an error and SHALL NOT substitute the current time.
+11. IF the AI_Interpretation_Engine is unavailable or returns no recommended steps, THEN THE Scryvorn SHALL use a fixed, reviewed list of fallback verification steps. All steps SHALL be labeled as recommendations for the user, not as verification Scryvorn performed, and THE Scryvorn SHALL NOT claim it visited or confirmed any destination.
 
 ### Requirement 10: Landing-Page Roadmap
 
