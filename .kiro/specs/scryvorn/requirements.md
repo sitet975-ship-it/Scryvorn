@@ -196,4 +196,4 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 9. IN production, THE Scryvorn SHALL read server secrets only from Netlify environment variables that are available to functions at runtime. Secrets SHALL NOT be declared in `netlify.toml`, because variables declared there are not available to functions.
 10. THE Scryvorn SHALL NOT enable a production domain-age lookup service until an approved, bounded lookup policy exists (Design: "Domain-age lookup timing").
 
-> **Transition note:** the Cloudflare configuration (`package.json` `pages:build` and `@cloudflare/next-on-pages`, `.npmrc`, `wrangler.toml`, and the related `.gitignore` entries) is still in the repository and will be removed in a separate, approved change. Until then it is unused for deployment.
+> **Implementation status note:** the former Cloudflare Pages adapter and its configuration have been removed. Node.js 24 is pinned for Netlify builds through `.nvmrc`; local development currently uses Node 26, and the pin does not guarantee identical behavior between the two.

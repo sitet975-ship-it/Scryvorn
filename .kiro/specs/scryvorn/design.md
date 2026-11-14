@@ -111,7 +111,7 @@ sequenceDiagram
 3. Confirm how environment variables reach functions on the actual Netlify plan, especially whether Functions scoping is available.
 4. Measure a deploy-preview scan request (cold and warm, AI enabled) before treating the 60-second limit as a safe operating budget.
 
-**Transition: Cloudflare configuration still present.** `package.json` (`pages:build`, `@cloudflare/next-on-pages`), `.npmrc` (`legacy-peer-deps`, needed only for that package), `wrangler.toml`, and the Cloudflare entries in `.gitignore` remain until a separate, approved executable change removes them. They are not used for the Netlify deployment.
+**Former Cloudflare setup removed (Stage B).** The previous Cloudflare Pages adapter, its build script, its npm peer-dependency override, and its configuration file have been removed from the repository. Node.js 24 is pinned for Netlify builds through `.nvmrc`. Local development currently uses Node 26. The pin does not make the local and Netlify runtimes identical or guarantee identical behavior.
 
 Full WCAG validation, responsive checks, and Netlify build success are covered in the Testing Strategy.
 

@@ -10,4 +10,4 @@ Scryvorn deploys to Netlify using Netlify's built-in Next.js support. The scan A
 - Netlify synchronous functions have a 60-second execution limit that is not configurable. The AI request timeout is 30 seconds; real request latency has not been measured yet.
 - Do not enable a production domain-age lookup service until a bounded lookup policy is approved.
 
-The Cloudflare configuration files still in the repository (`wrangler.toml`, the `pages:build` script) are no longer used and will be removed separately.
+Node.js 24 is pinned for Netlify builds through `.nvmrc`. Local development may use a different version (currently Node 26), so local and Netlify behavior can differ.

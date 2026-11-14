@@ -148,6 +148,9 @@ vite.config.ts.timestamp-*
 # Turbo Repo
 .turbo
 
-# Cloudflare Pages / next-on-pages build output
+# Vercel-format build output (.vercel/output was used by the removed
+# next-on-pages workflow; retained because .vercel is not exclusive to it)
 .vercel
-.wrangler
+
+# Netlify CLI local state (`netlify link` writes .netlify/state.json)
+.netlify
