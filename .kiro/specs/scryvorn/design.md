@@ -132,7 +132,7 @@ lib/
     urlExtractor.ts           extractUrls(text): string[]
     httpsValidator.ts         checkHttps(url): DeterministicFinding
     shortenerDetector.ts      detectShortener(url, list): DeterministicFinding | null
-    domainHeuristic.ts        domainHeuristic(url, tldList): DeterministicFinding[]
+    domainHeuristic.ts        domainHeuristic(url, tldList, legitimateDomains?: KnownLegitimateDomainList): DeterministicFinding[]
     scamTriggerDetector.ts    detectScamTriggers(text, triggerSet): DeterministicFinding[]
     domainAgeLookup.ts        lookupDomainAge(domain, service?): Promise<DeterministicFinding|null>
     deterministicEngine.ts    runDeterministicChecks(input, opts?): Promise<DeterministicResult>
@@ -179,19 +179,42 @@ Client-side validation prevents submitting empty input (no call is made); the se
 **Deterministic engine**
 
 ```ts
+// Checks that must all finish for a run to be "complete". Domain age is optional.
+export type RequiredCheckName = Exclude<CheckName, "domain_age">;
+export type DeterministicRunStatus = "complete" | "incomplete";
+
 export interface DeterministicResult {
   findings: DeterministicFinding[];
-  domainAgeAvailable: boolean; // false when lookup unconfigured/failed
+  status: DeterministicRunStatus;        // "incomplete" after an unexpected internal check failure
+  incompleteChecks: RequiredCheckName[]; // unfinished required checks, pipeline order; [] iff complete
+  domainAgeAvailable: boolean;           // false when lookup unconfigured/failed, or skipped (incomplete run)
+  lookalikeCheckActive: boolean;         // a non-empty legitimate-domain list was injected (configuration, not execution)
 }
 
 // Orchestrates pure checks in order; the only async step is the optional domain-age lookup.
 export async function runDeterministicChecks(
   input: string,
-  opts?: { domainAgeLookup?: (domain: string) => Promise<number | null> }
+  opts?: {
+    domainAgeLookup?: (domain: string) => Promise<number | null>;
+    legitimateDomains?: KnownLegitimateDomainList; // injected; absent/empty => lookalike check inactive
+    domainAgeTimeoutMs?: number;                   // per-lookup wait limit; default 5000 (DOMAIN_AGE_TIMEOUT_MS)
+  }
 ): Promise<DeterministicResult>;
 ```
 
+**Completion status.** Required checks are `url_extraction`, `https_status`, `shortener`, `domain_heuristic`, and `scam_triggers`. A required check counts as finished only after it has run over the whole input (per-URL checks: after the last URL). If an unexpected internal failure interrupts them, the engine keeps the findings collected so far, sets `status: "incomplete"`, and lists the unfinished required checks in `incompleteChecks`. No exception text or user input is recorded in this metadata. When a run is incomplete, the optional domain-age stage is skipped (no lookup, no note, `domainAgeAvailable: false`). Individual checks do not swallow unexpected internal errors (they still return no finding for unparseable URLs), so a failure surfaces as an incomplete run instead of a normal-looking empty result. Two expected states are NOT failures and leave `status: "complete"`: an absent or empty legitimate-domain list (lookalike check inactive), and an unconfigured or failing optional domain-age lookup (informational fallback note).
+
+**Downstream requirement (Req 6.9).** Scoring, report, API, and UI tasks must not present an incomplete deterministic run as a completed assessment. In particular, a Risk_Score computed from partial findings must not be shown as "Low risk — still verify independently", and the Evidence_Report and UI must state that the deterministic checks did not complete and name the unfinished checks.
+
+**Lookalike detection and the known-legitimate-domain list.** No production reference list of legitimate domains exists, and none is invented or bundled. `domainHeuristic(url, tldList, legitimateDomains?)` takes the list as an optional injected argument. With an empty or absent list, lookalike checking is INACTIVE and produces no lookalike findings; this means the check was not performed, NOT that the domain passed. A reviewed, versioned list (same shape as the other `/data` files: `version`, `source`, `date`, `domains`) can be supplied later and injected by the scan route. Matching compares the parsed hostname's last two labels only (never path or query substrings), using conservative rules (character substitution, single omission, typosquatting). Low-confidence matches are labeled "Needs manual verification" and set `needsManualVerification=true`; the finding never asserts impersonation. The engine performs no network requests by default.
+
+`lookalikeCheckActive` reports configuration, not execution. `true` means a non-empty list was injected, so lookalike comparison was enabled for the run; it does not prove the comparison ran for every URL. That holds only when `incompleteChecks` does not include `domain_heuristic`. `false` means lookalike checking was not performed.
+
+**Not ready for general production activation.** The comparison treats a hostname's last two labels as its registrable domain and uses no Public Suffix List, so it mishandles multi-label public suffixes such as `co.uk`. With `paypal.co.uk` listed, `paypa1.co.uk` is missed. With `paypal.com` listed, the real `paypal.co.uk` gets a misleading low-confidence finding. The public-suffix handling must be reviewed and corrected before any production reference list is enabled. Until then, Req 4.4 and 4.12 are only partially satisfied.
+
 The engine calls the pure check functions (`extractUrls`, `checkHttps`, `detectShortener`, `domainHeuristic`, `detectScamTriggers`) in a fixed order, then the optional `domainAgeLookup`. On any lookup failure/unconfiguration it appends an informational "domain-age data unavailable" finding rather than aborting.
+
+**Domain-age lookup timing.** Lookups run sequentially, once per unique parsed hostname in first-seen order. Each lookup waits at most `domainAgeTimeoutMs` (default 5,000 ms, `DOMAIN_AGE_TIMEOUT_MS` in `lib/checks/domainAgeLookup.ts`) and is then treated as failed. The timeout limits waiting only: it does not cancel the injected service, which may keep running in the background, because the lookup function signature has no abort signal. There is currently no overall time budget and no limit on how many hostnames are looked up, so total time grows with the number of unique hostnames in the input. **Before a production domain-age service is enabled**, an overall lookup budget or a bounded lookup policy (for example, a hostname-count limit) must be designed and approved. No such limit is set yet.
 
 **AI engine**
 
@@ -302,7 +325,7 @@ export interface DeterministicFinding {
   id: string;
   source: "deterministic";
   check: CheckName;
-  category: string;                  // e.g. "https_status" | "shortener" | "suspicious_tld" | "lookalike" | "upfront_payment" | "domain_age_unavailable"
+  category: string;                  // e.g. "https_status" | "shortener" | "elevated_attention_tld" | "lookalike" | "upfront_payment" | "domain_age_unavailable"
   label: string;                     // check-type label, human readable
   evidence: string;                  // outcome description
   url?: string;                      // affected URL (URL-based checks)
@@ -332,15 +355,7 @@ export interface AiFinding {
 
 All three lists are committed, reviewable JSON files with a `version`, `source`, and `date` so findings can cite them (Req 4.10, 4.11).
 
-```jsonc
-// data/shorteners.json
-{
-  "version": "2026.01",
-  "source": "https://example.org/known-url-shorteners",
-  "date": "2026-01-01",
-  "domains": ["bit.ly", "tinyurl.com", "t.co", "goo.gl", "ow.ly", "is.gd", "buff.ly"]
-}
-```
+`data/shorteners.json`: the committed file in `/data` is authoritative for its contents (shape: `version`, `source`, `date`, `domains`).
 
 ```jsonc
 // data/elevatedAttentionTlds.json
@@ -353,22 +368,7 @@ All three lists are committed, reviewable JSON files with a `version`, `source`,
 }
 ```
 
-```jsonc
-// data/scamTriggers.json
-{
-  "version": "2026.01",
-  "source": "internal-curation",
-  "date": "2026-01-01",
-  "categories": [
-    { "id": "upfront_payment", "label": "upfront payment request", "phrases": ["upfront fee", "processing fee", "advance payment", "pay now to claim"] },
-    { "id": "credential_request", "label": "credential request", "phrases": ["send your otp", "enter your pin", "confirm your password", "share your otp"] },
-    { "id": "urgency_pressure", "label": "urgency pressure", "phrases": ["act now", "urgent", "immediately", "within 24 hours", "account will be closed"] },
-    { "id": "off_platform_move", "label": "off-platform move", "phrases": ["move to whatsapp", "continue on telegram", "dm me on signal", "add me on telegram"] },
-    { "id": "crypto_payment_demand", "label": "crypto payment demand", "phrases": ["pay in bitcoin", "send btc", "ethereum transfer", "usdt payment"] },
-    { "id": "suspicious_job_offer", "label": "suspicious job offer", "phrases": ["remote job", "work from home", "easy money", "earn $5000 weekly", "no experience needed"] }
-  ]
-}
-```
+`data/scamTriggers.json`: the committed file in `/data` is authoritative for its categories and phrases. Any phrase lists shown elsewhere in this spec are illustrative only.
 
 ### Scoring Configuration
 
@@ -378,7 +378,7 @@ All three lists are committed, reviewable JSON files with a `version`, `source`,
 export const SCORING_WEIGHTS = {
   deterministic: {
     shortener: 15,
-    suspicious_tld: 20,
+    elevated_attention_tld: 0,  // informational context only (Req 4.4); never adds risk
     lookalike_high: 20,
     lookalike_low: 10,
     scam_trigger_each: 12,
@@ -402,6 +402,8 @@ export const AI_TIMEOUT_MS = 30_000;
 export const ADVISORY_DISCLAIMER =
   "Scryvorn provides risk signals and verification guidance, not financial, legal, or law-enforcement advice. Always verify independently.";
 ```
+
+**Decision: elevated-attention TLDs are informational only.** Elevated-attention TLD matches are shown as informational context requiring review. They carry weight 0, do not change the Risk_Score, and cannot by themselves escalate the Severity_Tier (Req 4.13). Informational findings (weight 0: `https_status`, `elevated_attention_tld`, `domain_age_unavailable`) are kept distinct from scored risk contributions.
 
 `computeRiskScore` sums these weights (capping the total scam-trigger contribution at `scam_trigger_max_total`), clamps to `[0,100]`, and rounds to an integer. Because the weights and clamp are fixed, identical findings always yield an identical score and the tier is derived purely from that score.
 
@@ -459,7 +461,8 @@ For Scryvorn's pure logic layer, a small, high-value set of property-based tests
 | AI returns an error | Same unavailable path (`reason: "error"`); deterministic findings preserved, no rollback. | 3.4 |
 | AI returns malformed JSON | Treated as an AI error (unavailable path); deterministic findings stand. | 3.4 |
 | Domain-age lookup unconfigured | The lookup step is skipped entirely; an informational "domain-age data unavailable" finding is appended. | 4.6, 4.7 |
-| Domain-age lookup fails (timeout/error/unreachable) | Treated as unavailable; absence noted; scan completes. | 4.7 |
+| Domain-age lookup fails (timeout/error/unreachable) | Treated as unavailable; absence noted; scan completes. The timeout stops waiting but does not cancel the injected service. | 4.7 |
+| Unexpected internal failure in a required deterministic check | Engine keeps findings collected so far and returns `status: "incomplete"` with `incompleteChecks` (check names only, no exception text or user input); the optional domain-age stage is skipped. Downstream layers must not present the result as a completed assessment or as "Low risk — still verify independently". | 6.9 |
 | Copy-to-clipboard fails | UI shows an "export failed" notice; the Evidence_Report is preserved so the user can retry. | 9.6 |
 | Download fails | UI shows an "export failed" notice; the Evidence_Report is preserved for retry. | 9.6 |
 | Network error on the scan POST | UI shows an error state; no scan result is rendered; the user can retry; no fabricated AI findings. | 2.8 |

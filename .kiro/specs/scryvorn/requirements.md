@@ -89,6 +89,9 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 10. THE Deterministic_Check_Engine SHALL store URL-shortener and elevated-attention TLD lists as versioned, reviewable data files in the repository, each with a source and date reference.
 11. THE Deterministic_Check_Engine SHALL cite the relevant list version or reference in each finding based on a URL-shortener or elevated-attention TLD list.
 12. WHEN the Domain_Heuristic flags a lookalike domain, THE Domain_Heuristic SHALL use conservative similarity rules, SHALL display the suspected legitimate domain and the specific similarity reason, and SHALL label low-confidence matches as "Needs manual verification" rather than asserting impersonation.
+13. THE Deterministic_Check_Engine SHALL assign elevated-attention TLD findings a risk weight of 0, so that a TLD match alone does not change the Risk_Score or escalate the Severity_Tier.
+
+> **Implementation status note:** lookalike comparison (4.4, 4.12) requires a reviewed known-legitimate-domain reference list, which is not yet supplied. Until it is supplied, lookalike checking is inactive and these criteria are not fully satisfied. In addition, the current comparison treats a hostname's last two labels as its registrable domain and does not handle multi-label public suffixes (for example `co.uk`), so it is not ready for general production activation. That handling must be reviewed and corrected before any production reference list is enabled.
 
 ### Requirement 5: Deterministic Scam-Trigger Phrase Detection
 
@@ -121,6 +124,7 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 6. THE Scryvorn SHALL NOT render the label "Verified Safe" or any wording claiming the Scanner_Input is definitively safe.
 7. THE Scryvorn SHALL display itemized evidence supporting the Risk_Score alongside the Wax_Seal_Stamp.
 8. IF the AI_Interpretation_Engine is unavailable or returns an error, THEN THE Scryvorn SHALL compute the Risk_Score from Deterministic_Check_Engine findings alone.
+9. IF the Deterministic_Check_Engine reports that its required checks did not complete, THEN THE Scryvorn SHALL NOT present the scan as a completed assessment, SHALL NOT present it as "Low risk — still verify independently", and SHALL state in the UI and the Evidence_Report that the deterministic checks did not complete and which checks were not finished.
 
 ### Requirement 7: Separation of Verified Checks and AI Interpretation
 

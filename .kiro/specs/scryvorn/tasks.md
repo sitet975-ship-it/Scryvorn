@@ -33,19 +33,19 @@ The implementation follows the layered architecture from the design: pure determ
     - Verify `LICENSE` contains standard MIT license text
     - _Requirements: 11.2, 11.3, 11.4, 11.5, 11.6_
 
-- [ ] 2. Create core types and constants
-  - [ ] 2.1 Create shared TypeScript types
+- [x] 2. Create core types and constants
+  - [x] 2.1 Create shared TypeScript types
     - Create `lib/types.ts` with `SeverityTier`, `InputType`, `ScanResult` interfaces
     - Create `lib/checks/types.ts` with `CheckName`, `DeterministicFinding`, `DeterministicResult`
     - Create `lib/ai/types.ts` with `AiFinding`, `AiOutcome`
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.1, 7.2_
 
-  - [ ] 2.2 Create constants module
-    - Create `lib/constants.ts` with theme palette hex values, `INPUT_MAX_CHARS` (10000), `AI_TIMEOUT_MS` (30000), `SCORING_WEIGHTS` (deterministic and AI weights), `SEVERITY_TIERS` (three tiers with min/max/color), and `ADVISORY_DISCLAIMER` text
+  - [x] 2.2 Create constants module
+    - Create `lib/constants.ts` with theme palette hex values, `INPUT_MAX_CHARS` (10000), `AI_TIMEOUT_MS` (30000), `SCORING_WEIGHTS` (deterministic and AI weights; `SCORING_WEIGHTS` uses `elevated_attention_tld: 0` because TLD matches are informational only), `SEVERITY_TIERS` (three tiers with min/max/color), and `ADVISORY_DISCLAIMER` text
     - _Requirements: 2.1–2.4, 4.8, 6.1–6.5, 8.1_
 
-- [ ] 3. Implement deterministic check engine (pure functions)
-  - [ ] 3.1 Implement URL Extractor
+- [x] 3. Implement deterministic check engine (pure functions)
+  - [x] 3.1 Implement URL Extractor
     - Create `lib/checks/urlExtractor.ts` with `extractUrls(text: string): string[]`
     - Extract every URL from message text; skip unparseable tokens gracefully without crashing
     - _Requirements: 4.1_
@@ -54,7 +54,7 @@ The implementation follows the layered architecture from the design: pure determ
     - **Property 1: URL extraction recovers all embedded URLs**
     - **Validates: Requirements 4.1**
 
-  - [ ] 3.3 Implement HTTPS Validator
+  - [x] 3.3 Implement HTTPS Validator
     - Create `lib/checks/httpsValidator.ts` with `checkHttps(url: string): DeterministicFinding`
     - Record whether URL uses HTTPS scheme; finding always carries `weight: 0` (informational only)
     - _Requirements: 4.2, 4.8_
@@ -63,7 +63,7 @@ The implementation follows the layered architecture from the design: pure determ
     - **Property 2: HTTPS status is informational and never contributes to the risk score**
     - **Validates: Requirements 4.2, 4.8**
 
-  - [ ] 3.5 Implement Shortener Detector
+  - [x] 3.5 Implement Shortener Detector
     - Create `lib/checks/shortenerDetector.ts` with `detectShortener(url: string, list: ShortenerList): DeterministicFinding | null`
     - Flag URLs whose registrable domain is in the shortener list; cite list version in `reference` field
     - _Requirements: 4.3, 4.11_
@@ -72,15 +72,19 @@ The implementation follows the layered architecture from the design: pure determ
     - **Property 3: URL-shortener detection matches the list**
     - **Validates: Requirements 4.3**
 
-  - [ ] 3.7 Implement Domain Heuristic
-    - Create `lib/checks/domainHeuristic.ts` with `domainHeuristic(url: string, tldList: ElevatedAttentionTldList): DeterministicFinding[]`
-    - Flag suspicious TLDs from the elevated-attention TLD list with specific reason in evidence; TLD findings are informational context, not a high-risk verdict
+  - [x] 3.7 Implement Domain Heuristic
+    - Create `lib/checks/domainHeuristic.ts` with `domainHeuristic(url: string, tldList: ElevatedAttentionTldList, legitimateDomains?: KnownLegitimateDomainList): DeterministicFinding[]`
+    - Flag elevated-attention TLDs from the TLD list as informational context (category `elevated_attention_tld`, weight 0), with specific reason in evidence; not evidence of fraud
+    - The known-legitimate-domain list is injectable and empty by default; no production list is bundled; with an empty/absent list lookalike checking is inactive (not performed, not "passed")
+    - Test lookalike logic with clearly labeled synthetic fixtures only
+    - Req 4.4/4.12 remain partially satisfied until a reviewed list is supplied
+    - Not ready for general production activation: the last-two-labels base mishandles multi-label public suffixes (e.g. `co.uk`); review and correct this before any production reference list is enabled
     - Flag lookalike domains using conservative similarity rules (character substitution, omission, typosquatting); display suspected legitimate domain and similarity reason
     - Label low-confidence lookalike matches as "Needs manual verification" rather than asserting impersonation
     - Cite list version in `reference` for TLD findings
     - _Requirements: 4.4, 4.12_
 
-  - [ ] 3.8 Implement Scam Trigger Detector
+  - [x] 3.8 Implement Scam Trigger Detector
     - Create `lib/checks/scamTriggerDetector.ts` with `detectScamTriggers(text: string, triggerSet: ScamTriggerSet): DeterministicFinding[]`
     - Match input against six trigger phrase sets: upfront payment, credential request, urgency pressure, off-platform move, crypto payment demand, suspicious job offer
     - Produce exactly one finding per matched category; include category label and matched phrase text in each finding
@@ -92,17 +96,21 @@ The implementation follows the layered architecture from the design: pure determ
     - **Property 4: Scam-trigger detection yields one finding per matched category and none otherwise**
     - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 5.7, 5.9, 5.10**
 
-  - [ ] 3.10 Implement Domain Age Lookup
+  - [x] 3.10 Implement Domain Age Lookup
     - Create `lib/checks/domainAgeLookup.ts` with `lookupDomainAge(domain: string, service?: DomainAgeService): Promise<DeterministicFinding | null>`
     - Return domain registration age finding when service is configured and succeeds
     - Return null when service is unconfigured or fails (timeout, error, unreachable); engine appends informational note
     - _Requirements: 4.6, 4.7_
 
-  - [ ] 3.11 Implement Deterministic Engine orchestrator
+  - [x] 3.11 Implement Deterministic Engine orchestrator
     - Create `lib/checks/deterministicEngine.ts` with `runDeterministicChecks(input: string, opts?): Promise<DeterministicResult>`
     - Call pure check functions in fixed order: extractUrls, then per-URL checkHttps/detectShortener/domainHeuristic, then detectScamTriggers, then optional domainAgeLookup
     - Load versioned data files (shorteners.json, elevatedAttentionTlds.json, scamTriggers.json) and pass to check functions
     - Append informational "domain-age data unavailable" finding when lookup is unconfigured or fails
+    - Accept an optional injected legitimate-domain list and domain-age lookup in `opts`; perform no network requests by default
+    - Return `status` (`"complete"` | `"incomplete"`) and `incompleteChecks`; an unexpected internal failure keeps findings collected so far but marks the run incomplete, with no exception text or user input in the metadata
+    - Inactive lookalike checking and an unavailable optional domain-age lookup do not make a run incomplete; `lookalikeCheckActive` reports configuration, not execution
+    - Domain-age lookups are sequential with a per-lookup `domainAgeTimeoutMs` (default 5000 ms) that limits waiting but does not cancel the service; an overall budget or bounded lookup policy is required before enabling a production domain-age service
     - Analyze URL structure and metadata only; never fetch, crawl, render, screenshot, or download content from user-supplied URLs
     - _Requirements: 3.1, 4.1, 4.5, 4.6, 4.7, 4.9, 4.10, 4.11_
 
@@ -132,7 +140,8 @@ The implementation follows the layered architecture from the design: pure determ
     - Create `severityTierForScore(score: number): { tier: SeverityTier; color: string }`
     - Map score ranges: 0–39 to "Low risk — still verify independently" (Potion Emerald #059669), 40–69 to "Caution — verify before acting" (Candlelight Gold #D97706), 70–100 to "TRAP DETECTED" (Crimson Wax #DC2626)
     - Tier derives strictly from score, never the reverse
-    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.8_
+    - Never present a deterministic result with `status: "incomplete"` as a completed "Low risk — still verify independently" assessment (Req 6.9)
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.8, 6.9_
 
   - [ ]* 5.2 Write property test for risk-score boundary mapping
     - **Property 5: Risk-score boundaries map to the correct severity tier**
@@ -143,7 +152,8 @@ The implementation follows the layered architecture from the design: pure determ
     - Include scan timestamp, input type, Risk_Score, Severity_Tier, deterministic findings, AI findings, recommended verification steps, and advisory disclaimer
     - When AI is unavailable, include deterministic findings and explicit "AI analysis unavailable" notice; still generate the report
     - Create `reportFilename(timestamp: string): string` returning `scryvorn-report-YYYYMMDD-HHmmss.md`
-    - _Requirements: 9.2, 9.3, 9.4_
+    - When the deterministic run is incomplete, state that the checks did not complete and list the unfinished checks; do not present the report as a completed assessment (Req 6.9)
+    - _Requirements: 6.9, 9.2, 9.3, 9.4_
 
   - [ ]* 5.4 Write property test for evidence report with AI unavailable
     - **Property 6: Evidence report is complete and timestamped when AI is unavailable**
@@ -158,7 +168,9 @@ The implementation follows the layered architecture from the design: pure determ
     - Derive `inputType` from whether URLs were found in the input
     - Return 200 with full `ScanResult` JSON (timestamp, inputType, riskScore, severityTier, waxSealColor, deterministicFindings, aiFindings, recommendedSteps, aiAvailable, aiUnavailableReason, disclaimer)
     - No logging of user input, URLs, or scan results; return sanitized error responses on unexpected errors without echoing user data
-    - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 6.8, 8.2, 8.4, 8.5, 11.1_
+    - Carry the deterministic `status` and `incompleteChecks` through to the response; an incomplete run must not be returned as a completed "Low risk" assessment (Req 6.9)
+    - Before enabling a production domain-age service, define an approved overall lookup budget or bounded lookup policy
+    - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 6.8, 6.9, 8.2, 8.4, 8.5, 11.1_
 
 - [ ] 7. Implement theme and scanner input UI components
   - [ ] 7.1 Implement Header component
@@ -210,7 +222,8 @@ The implementation follows the layered architecture from the design: pure determ
     - Display Severity_Tier and Risk_Score; color per tier (Crimson Wax #DC2626 for TRAP DETECTED, Candlelight Gold #D97706 for Caution, Potion Emerald #059669 for Low risk)
     - Never render "Verified Safe" or any wording claiming the input is definitively safe
     - Display itemized evidence supporting the Risk_Score alongside the stamp
-    - _Requirements: 6.2, 6.3, 6.4, 6.6, 6.7_
+    - When the deterministic run is incomplete, show that the checks did not complete instead of a completed "Low risk" stamp (Req 6.9)
+    - _Requirements: 6.2, 6.3, 6.4, 6.6, 6.7, 6.9_
 
   - [ ] 8.4 Implement EvidenceReportExport component
     - Create `components/scanner/EvidenceReportExport.tsx` with "Copy Evidence Report" and "Download Report (.md)" buttons

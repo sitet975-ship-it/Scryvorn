@@ -35,6 +35,128 @@
         "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
         "timestamp": 1794610919708
       }
+    ],
+    "2.1 Create shared TypeScript types": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617462173
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617578801
+      }
+    ],
+    "2.2 Create constants module": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617462573
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617579124
+      }
+    ],
+    "2. Create core types and constants": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617579237
+      }
+    ],
+    "3.1 Implement URL Extractor": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617608000
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617746013
+      }
+    ],
+    "3.3 Implement HTTPS Validator": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617608194
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617746593
+      }
+    ],
+    "3.5 Implement Shortener Detector": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617608424
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617747080
+      }
+    ],
+    "3.8 Implement Scam Trigger Detector": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617609305
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617747773
+      }
+    ],
+    "3.10 Implement Domain Age Lookup": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617609806
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617749104
+      }
+    ],
+    "3.7 Implement Domain Heuristic": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617749948
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617958182
+      }
+    ],
+    "3.11 Implement Deterministic Engine orchestrator": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794617959632
+      },
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794618145529
+      }
+    ],
+    "3. Implement deterministic check engine (pure functions)": [
+      {
+        "executionId": "d36587be-f9ed-4e04-873c-0c4618a16447",
+        "chatSessionId": "sess_e9358095-c08c-4e88-b03f-aca9aa0aceb1",
+        "timestamp": 1794618145698
+      }
     ]
   }
 }
