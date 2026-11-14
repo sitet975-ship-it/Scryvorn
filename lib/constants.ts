@@ -62,6 +62,17 @@ export const ADVISORY_DISCLAIMER =
   "Scryvorn provides risk signals and verification guidance, not financial, legal, or law-enforcement advice. Always verify independently.";
 
 /**
+ * Caps for the deterministic summary passed to the AI prompt (approved values).
+ * The summary is user-derived and untrusted; the caps bound its size.
+ */
+/** Maximum number of finding lines in the summary. */
+export const DETERMINISTIC_SUMMARY_MAX_FINDINGS = 20;
+/** Maximum characters per summary line, including the status line. */
+export const DETERMINISTIC_SUMMARY_MAX_LINE_CHARS = 200;
+/** Maximum characters in the whole summary, including line breaks. */
+export const DETERMINISTIC_SUMMARY_MAX_TOTAL_CHARS = 3000;
+
+/**
  * Reviewed fallback verification steps, used when AI is unavailable or
  * returns no steps. These are recommendations for the user to carry out,
  * not checks Scryvorn performed.
