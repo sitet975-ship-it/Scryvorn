@@ -188,18 +188,18 @@ The implementation follows the layered architecture from the design: pure determ
     - Before deployment, complete the pre-deployment checks in design "Deployment Topology" (publish-directory auto-detection, route handler and 405 behavior, environment variables on the actual plan, measured deploy-preview request)
     - _Requirements: 3.1, 3.3, 3.4, 3.5, 3.6, 6.8, 6.9, 8.2, 8.4, 8.5, 11.1, 11.7, 11.8, 11.9, 11.10_
 
-- [ ] 7. Implement theme and scanner input UI components
-  - [ ] 7.1 Implement Header component
+- [x] 7. Implement theme and scanner input UI components
+  - [x] 7.1 Implement Header component
     - Create `components/theme/Header.tsx` with Moonlit Midnight (#0D1117) background
     - Render decorative crescent moon and bat motif behind header text with `aria-hidden="true"` and low opacity so text stays distinguishable
     - _Requirements: 2.1_
 
-  - [ ] 7.2 Implement SpiderwebCorners component
+  - [x] 7.2 Implement SpiderwebCorners component
     - Create `components/theme/SpiderwebCorners.tsx` with decorative geometric SVG corner accents
     - Set `aria-hidden="true"`, `pointer-events: none`; position to not overlap input or results areas
     - _Requirements: 2.4_
 
-  - [ ] 7.3 Implement ScannerInput component
+  - [x] 7.3 Implement ScannerInput component
     - Create `components/scanner/ScannerInput.tsx` with `<textarea>` capped at 10,000 characters
     - Display live character counter
     - Render Pumpkin Orange (#FF5A1F) submit button
@@ -207,13 +207,13 @@ The implementation follows the layered architecture from the design: pure determ
     - All controls keyboard-accessible with visible focus states
     - _Requirements: 1.1, 1.5, 1.6, 2.3, 2.7_
 
-  - [ ] 7.4 Implement SampleTrapButtons component
+  - [x] 7.4 Implement SampleTrapButtons component
     - Create `components/scanner/SampleTrapButtons.tsx` with three buttons: "Fake Remote Job DM", "Phishing Payment Link", "Legitimate Bank Alert"
     - Clicking a button replaces any existing textarea content with the corresponding synthetic sample string
     - All buttons keyboard-accessible with visible focus states
     - _Requirements: 1.2, 1.3, 2.7_
 
-  - [ ] 7.5 Implement LoadingState component
+  - [x] 7.5 Implement LoadingState component
     - Create `components/scanner/LoadingState.tsx` with a simple visible loading indicator
     - Display text "Inspecting message and links…" while the POST request is in flight
     - Clear on response (success, error, or unavailable handled by result rendering)
