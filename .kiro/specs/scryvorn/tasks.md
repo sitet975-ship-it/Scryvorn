@@ -303,6 +303,8 @@ The implementation follows the layered architecture from the design: pure determ
   - Accepted Task 9 deviations, limitations, and pending manual checks:
     - Added (approved): `RecommendedSteps` between AiInterpretation and the export controls, using the shared `selectRecommendedSteps` rule; `ScannerInput` `serverError` prop; `input_too_long` is shown inline as well as `input_required`; a 45-second client timeout (`SCAN_CLIENT_TIMEOUT_MS`) via AbortController; request/response handling lives in `lib/scan/scanClient.ts`.
     - EvidenceReportExport is always rendered (after the results) so its buttons stay visibly disabled until a scan completes.
+    - AdvisoryDisclaimer is rendered once, in the root layout footer (`app/layout.tsx`); `app/page.tsx` composes ScannerCard and RoadmapSection only and does not render it again (deviation from the 9.4 "Compose ... AdvisoryDisclaimer" wording).
+    - `app/layout.tsx` uses the Tailwind default system font stack and loads no external web fonts (no separate "theme fonts" are configured).
     - ScannerInput error text now uses Dark Ink with a Crimson Wax left accent border (Task 8 follow-up resolved).
     - Without AI configured, "Fake Remote Job DM" and "Phishing Payment Link" each produce a deterministic score of 36 and display the Low-risk tier. Their scored findings can come only from scam-trigger phrases, because .example and .test domains are not in the shortener or elevated-attention TLD lists, and the scam-trigger total is capped at 36.
     - Accepted for the synthetic offline samples. AI is not assumed to elevate either sample to Caution or TRAP DETECTED: live AI output is model-dependent and must be verified on a deploy preview.
@@ -313,8 +315,8 @@ The implementation follows the layered architecture from the design: pure determ
 - [x] 10. Checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 11. Write integration, component, and compliance tests
-  - [ ]* 11.1 Write scan route integration tests
+- [x] 11. Write integration, component, and compliance tests
+  - [x]* 11.1 Write scan route integration tests
     - Exercise `/api/scan` with mocked AI and domain-age services
     - Assert deterministic checks run to completion before AI starts
     - Assert single JSON response is well-formed (full ScanResult)
@@ -326,7 +328,7 @@ The implementation follows the layered architecture from the design: pure determ
     - Assert server route writes no input/result to logs
     - _Requirements: 3.1, 3.3, 3.4, 4.6, 4.7, 6.8, 8.2, 8.4, 8.5_
 
-  - [ ]* 11.2 Write component tests with React Testing Library
+  - [x]* 11.2 Write component tests with React 19 `act` + jsdom helpers (`test/dom.ts`); React Testing Library is not used or installed
     - Assert sample buttons replace textarea content
     - Assert empty submit shows inline validation and does not call the API
     - Assert loading indicator appears during scan and clears on response
@@ -334,13 +336,13 @@ The implementation follows the layered architecture from the design: pure determ
     - Assert Wax-Seal shows correct tier, color, and score
     - Assert Copy/Download disabled until scan completes, enabled after
     - Assert export failure shows notice and preserves report for retry
-    - Assert all primary controls are keyboard-reachable and activatable with visible focus
+    - Assert all primary controls are native, focusable controls without a negative tabindex (visible focus rings and real tab order are manual browser checks; jsdom does not verify them)
     - Assert "Legitimate Bank Alert" sample yields low-risk result with no fabricated AI findings and independent-verification guidance (mocked AI)
     - Assert advisory disclaimer and section headings are present
     - Assert "Coming Soon" roadmap section and two item titles render
     - _Requirements: 1.2, 1.3, 1.5, 1.7, 2.7, 2.8, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 9.1, 9.5, 9.6, 10.1, 10.2_
 
-  - [ ]* 11.3 Write smoke and compliance tests
+  - [x]* 11.3 Write smoke and compliance tests
     - Validate data-file schemas: each JSON has `version`, `source`, `date`, and a non-empty list
     - Assert `.env.example` exists and lists every required env var with clearly-placeholder values
     - Assert `.gitignore` includes `.env.local` and keeps `.kiro/` tracked
@@ -351,6 +353,16 @@ The implementation follows the layered architecture from the design: pure determ
     - Assert `app/api/scan/route.ts` does not export `runtime = "edge"` (Req 11.7)
     - Assert `netlify.toml`, if present, declares no secret environment variables (Req 11.9)
     - _Requirements: 4.10, 10.3, 11.1, 11.3, 11.4, 11.5, 11.6, 11.7, 11.9_
+
+  - Task 11 coverage notes and limitations:
+    - New files: `app/api/scan/route.integration.test.tsx` (11.1), `components/scanner/ScannerCard.flow.test.tsx` (11.2), `tests/compliance.test.ts` (11.3). Bullets already satisfied by earlier tests were not duplicated.
+    - 11.1 domain age: the route injects no domain-age service, so route-level enrichment is not tested. Configured, unconfigured, and failed behavior is covered at the engine level (`lib/checks/deterministicEngine.test.ts`).
+    - 11.1 persistence and logging: route tests stub Web Storage, IndexedDB, and a cookie setter, record fs write calls made through the test module graph, assert console is never called, and assert no stdout/stderr write contains the user text. They do not observe writes made outside the test module graph.
+    - 11.2 focus: tests assert native, focusable controls without a negative tabindex. Visible focus rings, real tab order, layout overlap, real clipboard writes, and real downloads are manual browser checks.
+    - 11.2 "Legitimate Bank Alert": uses the real deterministic engine and assessScan with a mocked successful AI response that returns no findings and no steps; a live AI response may differ.
+    - 11.3 build: "build succeeds without those modules" is verified by the separate `npm run build` command, not inside Vitest.
+    - 11.3 secret scan: heuristic patterns over tracked and untracked non-ignored files, with an explicit allowlist of four synthetic test fixtures. Passing it does not prove that no secrets exist.
+    - `.env.example`: `AI_MODEL` now uses a placeholder value; the domain-age variables are marked "# Optional / currently disabled in code" and are not required.
 
 - [ ] 12. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
