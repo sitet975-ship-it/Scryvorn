@@ -364,8 +364,20 @@ The implementation follows the layered architecture from the design: pure determ
     - 11.3 secret scan: heuristic patterns over tracked and untracked non-ignored files, with an explicit allowlist of four synthetic test fixtures. Passing it does not prove that no secrets exist.
     - `.env.example`: `AI_MODEL` now uses a placeholder value; the domain-age variables are marked "# Optional / currently disabled in code" and are not required.
 
-- [ ] 12. Final checkpoint — Ensure all tests pass
+- [x] 12. Final checkpoint — Ensure all tests pass
   - Ensure all tests pass, ask the user if questions arise.
+  - Task 12 covers automated local verification only: `npx vitest run` (31 test files, 446 tests passed), `npx tsc --noEmit` (exit 0, no output), and `npm run build` (exit 0; `/` and `/_not-found` static, `/api/scan` dynamic). It does not establish production readiness, absence of vulnerabilities, or a full accessibility audit.
+  - Manual checks outstanding before production use:
+    - Local browser checks at 360, 768, and 1024 px: horizontal scrolling, spiderweb overlap, keyboard order, visible focus, clipboard copy and report download, refresh clearing the input and results, and screen-reader announcements.
+    - Deploy-preview checks: AI-configured and AI-unavailable paths, actual tiers for the three samples, request timing against the 45-second client timeout and Netlify's 60-second limit, Cache-Control headers on 200/400/500 responses, AI provider rate limiting, and absence of secrets or user text in function logs.
+  - Accepted limitations:
+    - npm audit findings remain, including two production findings through Next's bundled PostCSS; the major upgrades that would fix them (`next@16`, `vitest@5`) are deferred.
+    - No request-body size limit is applied before JSON parsing.
+    - Prompt-injection risk is reduced by escaping but not eliminated.
+    - Framework-generated 405 and OPTIONS responses do not carry `Cache-Control: no-store`.
+    - Pumpkin Orange focus outlines on parchment are about 2.81:1, below the 3:1 non-text contrast target.
+    - `next lint` has no ESLint dependency or configuration.
+    - Domain-age lookup remains disabled pending an approved rate-limit and timeout policy.
 
 ## Notes
 
