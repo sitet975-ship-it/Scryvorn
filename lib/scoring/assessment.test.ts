@@ -51,7 +51,7 @@ describe("assessScan: complete deterministic runs", () => {
     expect(a.incompleteChecks).toEqual([]);
     expect(a.riskScore).toBe(40);
     expect(a.severityTier).toBe("Caution — verify before acting");
-    expect(a.waxSealColor).toBe("#D97706");
+    expect(a.waxSealColor).toBe("#E8892B"); // Caution tier color (approved palette)
     expect(a.aiAvailable).toBe(true);
     expect(a.aiFindings).toEqual([aiHigh]);
     expect(a.recommendedSteps).toEqual(AI_OK.unavailable ? [] : AI_OK.recommendedSteps);

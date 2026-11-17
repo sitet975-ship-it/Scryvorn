@@ -134,12 +134,13 @@ describe("computeRiskScore", () => {
 
 describe("severityTierForScore", () => {
   it.each([
-    [0, "Low risk — still verify independently", "#059669"],
-    [39, "Low risk — still verify independently", "#059669"],
-    [40, "Caution — verify before acting", "#D97706"],
-    [69, "Caution — verify before acting", "#D97706"],
-    [70, "TRAP DETECTED", "#DC2626"],
-    [100, "TRAP DETECTED", "#DC2626"],
+    // Approved Halloween palette tier colors (Req 6 revision).
+    [0, "Low risk — still verify independently", "#15803D"],
+    [39, "Low risk — still verify independently", "#15803D"],
+    [40, "Caution — verify before acting", "#E8892B"],
+    [69, "Caution — verify before acting", "#E8892B"],
+    [70, "TRAP DETECTED", "#B91C1C"],
+    [100, "TRAP DETECTED", "#B91C1C"],
   ])("maps %s to %s", (score, tier, color) => {
     expect(severityTierForScore(score)).toEqual({ tier, color });
   });

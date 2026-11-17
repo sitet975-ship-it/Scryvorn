@@ -405,25 +405,24 @@ As a result the report contains no raw HTML, Markdown links, images, code fences
 
 ### Theme and Accessibility
 
-Theme palette (`lib/constants.ts`):
+Theme palette (`lib/constants.ts` THEME; Halloween forensic-laboratory redesign — this replaces the earlier Moonlit Midnight / parchment / Pumpkin Orange palette):
 
-| Token | Hex | Used for |
+| Token | Value | Used for |
 |---|---|---|
-| Moonlit Midnight | #0D1117 | Header background; light text on it |
-| Warm Aged Parchment | #F8F3E6 | Scanner card background |
-| Dark Ink | #1A1614 | Body text on parchment; small text on Pumpkin Orange / gold / emerald seals |
-| Pumpkin Orange | #FF5A1F | Primary submit button |
-| Crimson Wax | #DC2626 | "TRAP DETECTED" seal |
-| Candlelight Gold | #D97706 | "Caution — verify before acting" seal |
-| Potion Emerald | #059669 | "Low risk — still verify independently" seal |
+| Background | #070709 | Page and navigation background |
+| Card | #110D0F | Content panels |
+| Border | rgba(155,38,38,0.28) | Panel and control borders |
+| Primary crimson | #9B2626 | Primary buttons; danger and verdict accents |
+| Pumpkin amber | #E8892B | Atmosphere, investigation, active states, focus outlines; "Caution — verify before acting" tier accent |
+| Laboratory green | #4ADE80 / #2F8F5B | Laboratory energy (loading) and AI interpretation |
+| Ivory | #EAE2D6 | Headings and body text |
+| Muted | #A79F94 | Secondary text |
+| Danger | #B91C1C | "TRAP DETECTED" tier accent; error accent borders (never error text) |
+| Success | #15803D | "Low risk — still verify independently" tier accent |
 
-Contrast strategy (computed ratios; full WCAG validation requires manual testing with assistive technology):
-- Dark ink on parchment ≈ 15:1 — passes AAA.
-- Header: light cream/parchment text on Moonlit Midnight ≈ 15:1.
-- Submit button: bold white label ≥ 18.66 px on Pumpkin Orange ≈ 3:1 (meets AA large-text); small text on the button uses dark ink (≈ 5.6:1, meets AA normal-text).
-- Seals: white text on Crimson Wax (≈ 4.6:1, AA normal) for the TRAP seal; dark ink text on Candlelight Gold and Potion Emerald (≈ 5.6:1, AA normal) for the other two seals. Seal text is large/bold.
+Contrast strategy (computed ratios; full WCAG validation requires manual testing with assistive technology): all text is ivory or muted on the dark backgrounds; tier text is always ivory and tier colors are supplementary accents; the submit label is ivory on primary crimson; focus outlines are amber on the dark surfaces. The tests assert ivory on #110D0F ≥ 4.5:1, muted on #070709 and #110D0F ≥ 4.5:1, ivory on #9B2626 ≥ 4.5:1, and amber on #070709 / #110D0F ≥ 3:1.
 
-Decorative elements (moon/bat motif, spiderweb corners) are purely decorative: `aria-hidden="true"`, `pointer-events:none`, and rendered behind or away from interactive/result areas. All primary controls are real `<button>`/`<textarea>` elements with visible focus rings and full keyboard operability. The layout uses Tailwind responsive utilities to avoid horizontal scrolling at 360 px / 768 px / 1024 px.
+Decorative elements (`components/halloween/`: cathedral, jack-o'-lanterns, cobwebs, tarantula lane, descending spider, ghosts, bats, candles, fog, distant vampire, lab energy) are purely decorative: `aria-hidden="true"`, `focusable="false"` on SVGs, `pointer-events:none`, still under `prefers-reduced-motion: reduce`, and rendered behind content (fixed backdrop) or in reserved areas (the tarantula lane between main and the footer) so they never cover controls, text, findings, or focus outlines. All primary controls are real `<button>`/`<textarea>` elements with visible focus rings and full keyboard operability. The layout uses Tailwind responsive utilities to avoid horizontal scrolling at 360 px / 768 px / 1024 px.
 
 ## Data Models
 
@@ -548,9 +547,9 @@ export const SCORING_WEIGHTS = {
 } as const;
 
 export const SEVERITY_TIERS = [
-  { min: 70, max: 100, tier: "TRAP DETECTED", color: "#DC2626" },
-  { min: 40, max: 69, tier: "Caution — verify before acting", color: "#D97706" },
-  { min: 0, max: 39, tier: "Low risk — still verify independently", color: "#059669" },
+  { min: 70, max: 100, tier: "TRAP DETECTED", color: "#B91C1C" },
+  { min: 40, max: 69, tier: "Caution — verify before acting", color: "#E8892B" },
+  { min: 0, max: 39, tier: "Low risk — still verify independently", color: "#15803D" },
 ] as const;
 
 export const INPUT_MAX_CHARS = 10_000;

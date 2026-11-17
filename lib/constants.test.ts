@@ -30,9 +30,19 @@ describe("constants", () => {
 
   it("tier colors match the theme", () => {
     const colors = Object.fromEntries(SEVERITY_TIERS.map((t) => [t.min, t.color]));
-    expect(colors[70]).toBe(THEME.crimsonWax);
-    expect(colors[40]).toBe(THEME.candlelightGold);
-    expect(colors[0]).toBe(THEME.potionEmerald);
+    expect(colors[70]).toBe(THEME.danger);
+    expect(colors[40]).toBe(THEME.amber);
+    expect(colors[0]).toBe(THEME.success);
+    expect(THEME).toMatchObject({
+      background: "#070709",
+      card: "#110D0F",
+      crimson: "#9B2626",
+      amber: "#E8892B",
+      ivory: "#EAE2D6",
+      muted: "#A79F94",
+      danger: "#B91C1C",
+      success: "#15803D",
+    });
   });
 
   it("informational weights are zero", () => {

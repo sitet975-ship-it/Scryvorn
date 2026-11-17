@@ -17,7 +17,7 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 - **Evidence_Report**: The exportable artifact containing the full scan result and advisory disclaimer.
 - **Sample_Trap**: A one-click button that auto-fills a synthetic example Scanner_Input.
 - **Wax_Seal_Stamp**: The visual verdict stamp rendered on a completed scan showing the Severity_Tier and Risk_Score.
-- **Candlelight_Gold**: A thematic color (#D97706) used for the "Caution — verify before acting" Severity_Tier Wax_Seal_Stamp.
+- **Candlelight_Gold**: A thematic color (#D97706) originally used for the "Caution — verify before acting" Severity_Tier Wax_Seal_Stamp; replaced by pumpkin amber (#E8892B) in the Halloween redesign (see Requirement 6).
 - **URL_Extractor**: The component that identifies and extracts URLs from message text within the Deterministic_Check_Engine.
 - **HTTPS_Validator**: The component that checks whether an extracted URL uses the HTTPS scheme within the Deterministic_Check_Engine.
 - **Shortener_Detector**: The component that identifies URL-shortener domains within the Deterministic_Check_Engine.
@@ -47,10 +47,12 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 
 #### Acceptance Criteria
 
-1. THE Scryvorn SHALL render a Moonlit Midnight (#0D1117) header containing a decorative, non-interactive crescent moon and bat motif rendered behind header text such that the text remains clearly distinguishable from the motif.
-2. THE Scryvorn SHALL render the scanner card on a Warm Aged Parchment (#F8F3E6) background using dark ink (#1A1614) text.
-3. THE Scryvorn SHALL render the primary scan-submit button in Pumpkin Orange (#FF5A1F).
-4. THE Scryvorn SHALL render decorative, non-interactive geometric spiderweb corner accents on the scanner card that do not overlap the scan input field or results display area.
+*(Revised in the Halloween forensic-laboratory redesign. Criteria 1–4 originally specified a Moonlit Midnight #0D1117 header with a moon-and-bat motif, a Warm Aged Parchment #F8F3E6 card with dark ink #1A1614 text, a Pumpkin Orange #FF5A1F submit button labelled "Inspect for Traps", and spiderweb corner accents; those were implemented in Tasks 7–9 and later replaced.)*
+
+1. THE Scryvorn SHALL render a top navigation on the #070709 background with the "✧ SCRYVORN" brand on the left (the ✧ glyph decorative) and "How it works" and "About" links on the right, and SHALL render a decorative, non-interactive Halloween backdrop (gothic cathedral, jack-o'-lanterns, cobwebs, a tarantula in a dedicated lower lane, a descending spider, ghosts, bats, candles, fog, and a distant vampire silhouette) behind all content.
+2. THE Scryvorn SHALL render content panels on the card background (#110D0F) with ivory (#EAE2D6) or muted (#A79F94) text, crimson-tinted borders (rgba(155,38,38,0.28)), and ivory serif headings (Cormorant Garamond with system serif fallbacks; Inter with system sans fallbacks for body text).
+3. THE Scryvorn SHALL render the primary scan-submit button labelled "Examine the evidence →" (the arrow decorative) in primary crimson (#9B2626) with ivory text and an amber (#E8892B) glow, at a large tap-target size.
+4. Decorative Halloween elements SHALL be aria-hidden, not focusable, and ignore pointer input; SHALL NOT overlap or obscure interactive controls, text, findings, or focus indicators; SHALL NOT cause horizontal scrolling; SHALL be still under prefers-reduced-motion: reduce; and SHALL NOT flash rapidly. Crimson marks danger and verdicts, amber marks atmosphere and active states, and laboratory green (#4ADE80 / #2F8F5B) marks laboratory energy and AI interpretation.
 5. THE Scryvorn SHALL meet WCAG AA color-contrast ratios (4.5:1 for normal text, 3:1 for large text) for all text rendered on themed backgrounds.
 6. THE Scryvorn SHALL provide a responsive layout in which all content and interactive elements remain visible and operable without horizontal scrolling at minimum viewport widths of 360px (mobile), 768px (tablet), and 1024px (desktop).
 7. THE Scryvorn SHALL ensure all Sample_Trap buttons, text input, submit, copy, and download controls are fully operable via keyboard.
@@ -117,9 +119,10 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 #### Acceptance Criteria
 
 1. WHEN the Deterministic_Check_Engine completes its required checks, THE Scryvorn SHALL compute a Risk_Score as an integer in the range 0 to 100 from the combined Deterministic_Check_Engine and AI_Interpretation_Engine findings. (For an incomplete run, see criterion 9.)
-2. IF the Risk_Score is in the range 70 to 100, THEN THE Scryvorn SHALL assign the Severity_Tier "TRAP DETECTED" and SHALL render the Wax_Seal_Stamp as "TRAP DETECTED" in Crimson Wax (#DC2626).
-3. IF the Risk_Score is in the range 40 to 69, THEN THE Scryvorn SHALL assign the Severity_Tier "Caution — verify before acting" and SHALL render the Wax_Seal_Stamp as "Caution — verify before acting" in Candlelight Gold (#D97706).
-4. IF the Risk_Score is in the range 0 to 39, THEN THE Scryvorn SHALL assign the Severity_Tier "Low risk — still verify independently" and SHALL render the Wax_Seal_Stamp as "Low risk — still verify independently" in Potion Emerald (#059669).
+2. IF the Risk_Score is in the range 70 to 100, THEN THE Scryvorn SHALL assign the Severity_Tier "TRAP DETECTED" and SHALL render the Wax_Seal_Stamp as "TRAP DETECTED" with a #B91C1C tier accent.
+3. IF the Risk_Score is in the range 40 to 69, THEN THE Scryvorn SHALL assign the Severity_Tier "Caution — verify before acting" and SHALL render the Wax_Seal_Stamp as "Caution — verify before acting" with a #E8892B tier accent.
+4. IF the Risk_Score is in the range 0 to 39, THEN THE Scryvorn SHALL assign the Severity_Tier "Low risk — still verify independently" and SHALL render the Wax_Seal_Stamp as "Low risk — still verify independently" with a #15803D tier accent.
+   *(Revised in the Halloween redesign: tier accents were #DC2626 / #D97706 / #059669. The tier text itself SHALL always be rendered in ivory or another accessible light color; the accent color is supplementary. The displayed tier SHALL be the real Severity_Tier from the scan result; no fixed verdict wording SHALL be displayed.)*
 5. THE Scryvorn SHALL derive the Risk_Score from the combined Deterministic_Check_Engine and AI_Interpretation_Engine findings and SHALL NOT manually adjust the Risk_Score to fit a desired Severity_Tier.
 6. THE Scryvorn SHALL NOT render the label "Verified Safe" or any wording claiming the Scanner_Input is definitively safe.
 7. THE Scryvorn SHALL display itemized evidence supporting the Risk_Score alongside the Wax_Seal_Stamp.
@@ -161,7 +164,7 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 2. WHEN a user clicks the "Download Report (.md)" button, THE Scryvorn SHALL download the Evidence_Report as a Markdown file whose filename includes the scan timestamp.
 3. THE Evidence_Report SHALL include the scan timestamp, input type, Risk_Score and Severity_Tier (or, for an incomplete assessment, the incomplete notice from Requirement 6.9 in their place), deterministic findings, AI findings, recommended verification steps, and the advisory disclaimer.
 4. WHEN the AI_Interpretation_Engine is unavailable, THE Evidence_Report SHALL include the deterministic findings and an explicit "AI analysis unavailable" notice, SHALL NOT display any supplied AI findings, and SHALL still be generated.
-5. WHILE no scan has completed, THE Scryvorn SHALL NOT enable the "Copy Evidence Report" and "Download Report (.md)" buttons.
+5. WHILE no scan has completed, THE Scryvorn SHALL NOT enable the "Copy Evidence Report" and "Download Report (.md)" buttons. *(Halloween redesign: the buttons are offered only in the "Evidence, preserved." view, which exists only after a completed scan; before that they are not rendered at all.)*
 6. IF a copy or download operation fails, THEN THE Scryvorn SHALL display an error notice indicating the export failed and SHALL preserve the Evidence_Report so the user can retry.
 7. THE Evidence_Report SHALL use these distinct sections, in order: "Assessment status and coverage", "Scored deterministic findings", "Informational context", "Checks not performed / unavailable", "AI interpretation", "Recommended verification steps", and "Advisory disclaimer". HTTPS status and elevated-attention TLD findings SHALL appear under "Informational context"; domain-age unavailability and interrupted required checks SHALL appear under "Checks not performed / unavailable". THE Evidence_Report SHALL NOT describe absent findings as proof of safety.
 8. WHILE lookalike checking is inactive, THE Evidence_Report SHALL state "Lookalike checking was not performed because no reviewed reference list is configured. This is not a passed check." WHILE a reference list is configured, THE Evidence_Report SHALL describe lookalike checking as configured, not as proof that it ran.

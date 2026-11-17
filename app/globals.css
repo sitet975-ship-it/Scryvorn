@@ -3,26 +3,169 @@
 @tailwind utilities;
 
 :root {
-  --color-moonlit-midnight: #0D1117;
-  --color-aged-parchment: #F8F3E6;
-  --color-dark-ink: #1A1614;
-  --color-pumpkin-orange: #FF5A1F;
-  --color-crimson-wax: #DC2626;
-  --color-candlelight-gold: #D97706;
-  --color-potion-emerald: #059669;
+  --scry-bg: #070709;
+  --scry-card: #110D0F;
+  --scry-crimson: #9B2626;
+  --scry-amber: #E8892B;
+  --scry-green: #4ADE80;
+  --scry-ivory: #EAE2D6;
+  --scry-muted: #A79F94;
 }
 
 html {
-  scroll-behavior: smooth;
+  background-color: var(--scry-bg);
 }
 
 body {
-  background-color: var(--color-aged-parchment);
-  color: var(--color-dark-ink);
+  background-color: var(--scry-bg);
+  color: var(--scry-ivory);
   min-height: 100vh;
+  overflow-x: hidden;
 }
 
+/* Focus: amber outline on the dark surfaces used everywhere. */
 *:focus-visible {
-  outline: 2px solid var(--color-pumpkin-orange);
-  outline-offset: 2px;
+  outline: 2px solid var(--scry-amber);
+  outline-offset: 3px;
+}
+
+/* Decorative layers never take pointer input. */
+[data-decorative] {
+  pointer-events: none;
+}
+
+/*
+ * Ambient laboratory glow (static). This is what reduced-motion users see;
+ * with motion allowed the same glow breathes slowly (scry-ambient keyframes).
+ */
+.scry-ambient-ring {
+  box-shadow: 0 0 30px -8px rgba(74, 222, 128, 0.28), 0 0 46px -12px rgba(232, 137, 43, 0.3);
+}
+.scry-ambient-panel {
+  box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.12), 0 0 26px -14px rgba(74, 222, 128, 0.35), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+}
+
+/*
+ * All decorative motion lives inside this media query, so
+ * prefers-reduced-motion: reduce shows a still scene. Every animation is slow
+ * (no flashing faster than once every few seconds, small opacity changes).
+ */
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+
+  .scry-flicker { animation: scry-flicker 4.8s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+  .scry-flicker-slow { animation: scry-flicker 7s ease-in-out infinite alternate; transform-origin: 50% 100%; }
+  .scry-glow-pulse { animation: scry-glow 6s ease-in-out infinite alternate; }
+  .scry-fog-a { animation: scry-fog 70s linear infinite alternate; }
+  .scry-fog-b { animation: scry-fog 95s linear infinite alternate-reverse; }
+  .scry-ghost-a { animation: scry-ghost 46s ease-in-out infinite; }
+  .scry-ghost-b { animation: scry-ghost 61s ease-in-out infinite; animation-delay: -20s; }
+  .scry-ghost-c { animation: scry-ghost 53s ease-in-out infinite; animation-delay: -34s; }
+  .scry-bats { animation: scry-bats 38s linear infinite; }
+  .scry-bats-late { animation: scry-bats 52s linear infinite; animation-delay: -26s; }
+  .scry-wing { animation: scry-wing 0.9s ease-in-out infinite alternate; transform-origin: 50% 50%; transform-box: fill-box; }
+  .scry-descend { animation: scry-descend 16s ease-in-out infinite; }
+  .scry-gait-a { animation: scry-gait 1.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 50%; }
+  .scry-gait-b { animation: scry-gait 1.6s ease-in-out infinite alternate-reverse; transform-box: fill-box; transform-origin: 0% 50%; }
+  .scry-sweep { animation: scry-spin 9s linear infinite; transform-origin: 50% 50%; }
+  .scry-sweep-fast { animation: scry-spin 4s linear infinite; transform-origin: 50% 50%; }
+  .scry-arc { animation: scry-arc 3.2s ease-in-out infinite; }
+  .scry-arc-late { animation: scry-arc 3.2s ease-in-out infinite; animation-delay: -1.6s; }
+  .scry-ambient-ring { animation: scry-ambient-ring 7s ease-in-out infinite alternate; }
+  .scry-ambient-panel { animation: scry-ambient-panel 9s ease-in-out infinite alternate; }
+
+  /* Tarantula: walks the bottom lane on small screens ... */
+  .scry-tarantula-walk { animation: scry-lane-walk 70s linear infinite; }
+  /* ... and the outer perimeter (left gutter, bottom lane, right gutter) on wide screens. */
+  @media (min-width: 1024px) {
+    .scry-tarantula-walk { animation: scry-perimeter 160s linear infinite; }
+  }
+}
+
+@keyframes scry-flicker {
+  0% { opacity: 0.86; transform: scale(1, 0.97); }
+  50% { opacity: 1; transform: scale(0.98, 1.02); }
+  100% { opacity: 0.92; transform: scale(1.01, 0.99); }
+}
+@keyframes scry-glow {
+  from { opacity: 0.7; }
+  to { opacity: 1; }
+}
+@keyframes scry-fog {
+  from { transform: translateX(-6%); }
+  to { transform: translateX(6%); }
+}
+/* Short drift so ghosts stay in their own region of the backdrop. */
+@keyframes scry-ghost {
+  0% { transform: translate(0, 0); opacity: 0; }
+  15% { opacity: 1; }
+  50% { transform: translate(var(--drift, 10vw), -2vh); }
+  85% { opacity: 1; }
+  100% { transform: translate(calc(var(--drift, 10vw) * 2), 0); opacity: 0; }
+}
+@keyframes scry-bats {
+  from { transform: translateX(-20vw); }
+  to { transform: translateX(120vw); }
+}
+@keyframes scry-wing {
+  from { transform: scaleY(1); }
+  to { transform: scaleY(0.55); }
+}
+@keyframes scry-descend {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(140px); }
+}
+/*
+ * Bottom-lane walk (small screens): starts and ends at the resting position
+ * (20% from the left), walks right, turns, walks left, turns back.
+ */
+@keyframes scry-lane-walk {
+  0%, 4% { left: 20%; transform: rotate(0deg); }
+  40% { left: calc(96% - var(--tar-w) - 20px); transform: rotate(0deg); }
+  44% { left: calc(96% - var(--tar-w) - 20px); transform: rotate(180deg); }
+  84% { left: calc(4% + 20px); transform: rotate(180deg); }
+  88% { left: calc(4% + 20px); transform: rotate(360deg); }
+  100% { left: 20%; transform: rotate(360deg); }
+}
+/*
+ * Perimeter walk (wide screens), positions relative to the creature zone
+ * (main content + tarantula lane). The left and right gutters are reserved
+ * by main's lg padding; the bottom is the tarantula lane. The spider faces
+ * its direction of travel and turns at the corners:
+ * left gutter down, bottom lane right, right gutter up, turn, right gutter
+ * down, bottom lane left, left gutter up, turn.
+ */
+@keyframes scry-perimeter {
+  0% { left: -16px; top: 2%; transform: rotate(90deg); }
+  16% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(90deg); }
+  18% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(0deg); }
+  31% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(0deg); }
+  33% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(-90deg); }
+  49% { left: calc(100% - var(--tar-w) + 16px); top: 2%; transform: rotate(-90deg); }
+  51% { left: calc(100% - var(--tar-w) + 16px); top: 2%; transform: rotate(90deg); }
+  67% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(90deg); }
+  69% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(180deg); }
+  82% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(180deg); }
+  84% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(270deg); }
+  98% { left: -16px; top: 2%; transform: rotate(270deg); }
+  100% { left: -16px; top: 2%; transform: rotate(450deg); }
+}
+@keyframes scry-gait {
+  from { transform: rotate(-4deg); }
+  to { transform: rotate(4deg); }
+}
+@keyframes scry-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes scry-arc {
+  0%, 100% { opacity: 0.25; stroke-dashoffset: 0; }
+  50% { opacity: 0.9; stroke-dashoffset: -60; }
+}
+@keyframes scry-ambient-ring {
+  from { box-shadow: 0 0 26px -10px rgba(74, 222, 128, 0.22), 0 0 40px -14px rgba(232, 137, 43, 0.22); }
+  to { box-shadow: 0 0 40px -6px rgba(74, 222, 128, 0.42), 0 0 60px -10px rgba(232, 137, 43, 0.38); }
+}
+@keyframes scry-ambient-panel {
+  from { box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.10), 0 0 22px -16px rgba(74, 222, 128, 0.25), 0 24px 48px -24px rgba(0, 0, 0, 0.8); }
+  to { box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.24), 0 0 34px -12px rgba(74, 222, 128, 0.45), 0 24px 48px -24px rgba(0, 0, 0, 0.8); }
 }

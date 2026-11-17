@@ -19,7 +19,7 @@ import { click, render, submit, typeValue, type Rendered } from "@/test/dom";
 import { AI_HEADING } from "./AiInterpretation";
 import { LOADING_TEXT } from "./LoadingState";
 import { RECOMMENDED_STEPS_HEADING } from "./RecommendedSteps";
-import { ScannerCard } from "./ScannerCard";
+import { BACK_TO_ASSESSMENT_LABEL, NEW_INVESTIGATION_LABEL, ScannerCard, VIEW_REPORT_LABEL } from "./ScannerCard";
 import { INPUT_REQUIRED_MESSAGE } from "./ScannerInput";
 import {
   FINDINGS_HEADING,
@@ -104,29 +104,46 @@ describe("loading indicator clears on every response", () => {
 });
 
 describe("primary controls are native and focusable (jsdom-level only)", () => {
-  it("sample buttons, textarea, submit, copy, and download", async () => {
+  it("sample buttons, textarea, submit, view-report, new-investigation, copy, and download", async () => {
     const result = await resultWithAiNoFindings(SAMPLE_TRAPS[2].content);
     const f = fixedFetch(200, result);
     const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} />);
+
+    const check = (controls: HTMLElement[]) => {
+      for (const el of controls) {
+        expect(["BUTTON", "TEXTAREA"]).toContain(el.tagName);
+        const tabindex = el.getAttribute("tabindex");
+        expect(tabindex === null || Number(tabindex) >= 0).toBe(true);
+        expect((el as HTMLButtonElement).disabled).toBe(false);
+        el.focus();
+        expect(document.activeElement).toBe(el);
+      }
+    };
+    const byText = (t: string) => [...container.querySelectorAll("button")].find((b) => b.textContent === t)!;
+
+    // Awaiting view: samples, textarea, submit.
+    const awaiting = [...q(container).samples, q(container).textarea, container.querySelector('button[type="submit"]') as HTMLButtonElement];
+    expect(awaiting).toHaveLength(5);
+    check(awaiting);
+
     typeValue(q(container).textarea, "anything");
     submit(q(container).form);
     await flush();
 
-    const controls = [
-      ...q(container).samples,
-      q(container).textarea,
-      container.querySelector('button[type="submit"]') as HTMLButtonElement,
+    // Revealed view: report and new-investigation actions.
+    const revealed = [byText(VIEW_REPORT_LABEL), byText(NEW_INVESTIGATION_LABEL)];
+    expect(revealed.every(Boolean)).toBe(true);
+    check(revealed);
+
+    // Preserved view: copy, download, back, new investigation.
+    click(byText(VIEW_REPORT_LABEL));
+    const preserved = [
       ...([...container.querySelectorAll('[data-section="report-export"] button')] as HTMLButtonElement[]),
+      byText(BACK_TO_ASSESSMENT_LABEL),
+      byText(NEW_INVESTIGATION_LABEL),
     ];
-    expect(controls).toHaveLength(7);
-    for (const el of controls) {
-      expect(["BUTTON", "TEXTAREA"]).toContain(el.tagName);
-      const tabindex = el.getAttribute("tabindex");
-      expect(tabindex === null || Number(tabindex) >= 0).toBe(true);
-      expect((el as HTMLButtonElement).disabled).toBe(false);
-      el.focus();
-      expect(document.activeElement).toBe(el);
-    }
+    expect(preserved).toHaveLength(4);
+    check(preserved);
   });
 });
 

@@ -1,5 +1,4 @@
 import { useId } from "react";
-import type { DeterministicFinding } from "@/lib/checks/types";
 import type { ScanResult } from "@/lib/types";
 import {
   DOMAIN_AGE_SKIPPED_NOTICE,
@@ -9,83 +8,34 @@ import {
   partitionDeterministicFindings,
   unfinishedCheckNotice,
 } from "@/lib/report/evidenceReport";
+import { deterministicSource } from "@/lib/report/provenance";
 import { defangText } from "@/lib/report/safeMarkdown";
+import { EvidenceCard, SourceBadge } from "./EvidenceCard";
 
 /**
  * Deterministic (rule-based) evidence only. AI findings are never rendered here.
  *
- * Sub-areas mirror the Evidence_Report:
- * - Findings: scored findings (weight > 0), with score contribution.
- * - Informational context: weight-0 findings, without any score contribution.
- * - Checks not performed / unavailable: inactive lookalike checking,
- *   domain-age-unavailable notes, unfinished required checks. None of these is
- *   presented as a passed check.
+ * Sections (mirroring the Evidence_Report groups):
+ * - Evidence found: scored findings (weight > 0), with score contribution.
+ * - Context observed: weight-0 findings, without any score contribution.
+ * - Checks not performed: inactive lookalike checking, domain-age-unavailable
+ *   notes, unfinished required checks. None is presented as a passed check.
  *
- * All finding text is untrusted: it is rendered as plain React text after
- * defangText (the report's defanging), and URLs are never made clickable.
+ * Every item shows its provenance (message rules or link checks).
+ * All finding text is untrusted: rendered as plain React text after
+ * defangText, and URLs are never made clickable.
  */
 export const VERIFIED_CHECKS_HEADING = "Verified Checks";
 export const VERIFIED_CHECKS_SUBTITLE = "Rule-based checks — not AI";
-export const FINDINGS_HEADING = "Findings";
-export const INFORMATIONAL_HEADING = "Informational context";
-export const NOT_PERFORMED_HEADING = "Checks not performed / unavailable";
+export const FINDINGS_HEADING = "Evidence found";
+export const INFORMATIONAL_HEADING = "Context observed";
+export const NOT_PERFORMED_HEADING = "Checks not performed";
 export const NO_SCORED_FINDINGS_NOTICE =
   "No scored deterministic findings were produced. This is not proof that the message is safe.";
 export const PARTIAL_FINDINGS_NOTICE =
   "The deterministic checks did not complete. Findings below were collected before the interruption.";
 
-function FindingItem({ finding, showWeight }: { finding: DeterministicFinding; showWeight: boolean }) {
-  const checkType = knownCheckLabel(finding.check) ?? defangText(finding.check);
-  return (
-    <li data-finding={finding.category} className="rounded border border-dark-ink/20 bg-white/60 p-3">
-      <p className="font-semibold">{defangText(finding.label)}</p>
-      <dl className="mt-1 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-sm">
-        <dt className="font-medium">Check</dt>
-        <dd>{checkType}</dd>
-        {finding.url ? (
-          <>
-            <dt className="font-medium">URL</dt>
-            <dd data-url="" className="break-all font-mono">
-              {defangText(finding.url)}
-            </dd>
-          </>
-        ) : null}
-        <dt className="font-medium">Outcome</dt>
-        <dd>{defangText(finding.evidence)}</dd>
-        {finding.matchedText ? (
-          <>
-            <dt className="font-medium">Matched text</dt>
-            <dd>“{defangText(finding.matchedText)}”</dd>
-          </>
-        ) : null}
-        {finding.suspectedLegitDomain ? (
-          <>
-            <dt className="font-medium">Resembles</dt>
-            <dd className="break-all font-mono">{defangText(finding.suspectedLegitDomain)}</dd>
-          </>
-        ) : null}
-        {finding.needsManualVerification ? (
-          <>
-            <dt className="font-medium">Note</dt>
-            <dd>Needs manual verification</dd>
-          </>
-        ) : null}
-        {finding.reference ? (
-          <>
-            <dt className="font-medium">Reference</dt>
-            <dd>{defangText(finding.reference)}</dd>
-          </>
-        ) : null}
-        {showWeight ? (
-          <>
-            <dt className="font-medium">Score contribution</dt>
-            <dd data-weight="">+{finding.weight}</dd>
-          </>
-        ) : null}
-      </dl>
-    </li>
-  );
-}
+const H3 = "font-serif text-xl font-semibold text-scry-ivory";
 
 export function VerifiedChecks({ result }: { result: ScanResult }) {
   const id = useId();
@@ -99,68 +49,82 @@ export function VerifiedChecks({ result }: { result: ScanResult }) {
     (result.lookalikeCheckActive ? 0 : 1) + ageNotes.length + unfinished.length + (complete ? 0 : 1);
 
   return (
-    <section aria-labelledby={headingId} data-section="verified-checks" className="flex flex-col gap-4">
+    <section aria-labelledby={headingId} data-section="verified-checks" className="flex flex-col gap-6">
       <header>
-        <h2 id={headingId} className="text-xl font-bold">
+        <h2 id={headingId} className="font-serif text-2xl font-semibold text-scry-ivory sm:text-3xl">
           {VERIFIED_CHECKS_HEADING}
         </h2>
-        <p className="text-sm font-medium">{VERIFIED_CHECKS_SUBTITLE}</p>
+        <p className="mt-1 text-sm font-medium text-scry-amber">{VERIFIED_CHECKS_SUBTITLE}</p>
       </header>
 
       {!complete ? (
-        <p data-partial="" className="rounded border border-dark-ink/30 p-3 text-sm">
+        <p data-partial="" className="rounded-sm border-2 border-dashed border-scry-ivory/40 p-3 text-sm font-medium text-scry-ivory">
           {PARTIAL_FINDINGS_NOTICE}
         </p>
       ) : null}
 
       <div data-subarea="findings">
-        <h3 className="font-semibold">{FINDINGS_HEADING}</h3>
+        <h3 className={H3}>{FINDINGS_HEADING}</h3>
         {scored.length ? (
-          <ul className="mt-2 flex flex-col gap-2">
+          <ul className="mt-3 flex flex-col gap-3">
             {scored.map((f) => (
-              <FindingItem key={f.id} finding={f} showWeight />
+              <EvidenceCard key={f.id} finding={f} scored />
             ))}
           </ul>
         ) : (
-          <p className="mt-1 text-sm">{NO_SCORED_FINDINGS_NOTICE}</p>
+          <p className="mt-2 text-sm text-scry-ivory">{NO_SCORED_FINDINGS_NOTICE}</p>
         )}
       </div>
 
       <div data-subarea="informational">
-        <h3 className="font-semibold">{INFORMATIONAL_HEADING}</h3>
+        <h3 className={H3}>{INFORMATIONAL_HEADING}</h3>
         {informational.length ? (
           <>
-            <p className="mt-1 text-sm">{INFORMATIONAL_CONTEXT_NOTICE}</p>
-            <ul className="mt-2 flex flex-col gap-2">
+            <p className="mt-2 text-sm text-scry-muted">{INFORMATIONAL_CONTEXT_NOTICE}</p>
+            <ul className="mt-3 flex flex-col gap-3">
               {informational.map((f) => (
-                <FindingItem key={f.id} finding={f} showWeight={false} />
+                <EvidenceCard key={f.id} finding={f} scored={false} />
               ))}
             </ul>
           </>
         ) : (
-          <p className="mt-1 text-sm">None.</p>
+          <p className="mt-2 text-sm text-scry-ivory">None.</p>
         )}
       </div>
 
-      <div data-subarea="not-performed">
-        <h3 className="font-semibold">{NOT_PERFORMED_HEADING}</h3>
+      <div data-subarea="not-performed" className="rounded-sm border border-dashed border-scry-amber/40 p-4">
+        <h3 className={H3}>{NOT_PERFORMED_HEADING}</h3>
         {notPerformedCount ? (
-          <ul className="mt-2 flex list-disc flex-col gap-1 pl-5 text-sm">
-            {!result.lookalikeCheckActive ? <li>{LOOKALIKE_INACTIVE_NOTICE}</li> : null}
+          <ul className="mt-3 flex flex-col gap-3 text-sm text-scry-ivory">
+            {!result.lookalikeCheckActive ? (
+              <li className="flex flex-col gap-1">
+                <span><SourceBadge source="link_checks" /></span>
+                <span>{LOOKALIKE_INACTIVE_NOTICE}</span>
+              </li>
+            ) : null}
             {ageNotes.map((f) => (
-              <li key={f.id} data-finding={f.category}>
-                {defangText(f.label)}: {defangText(f.evidence)}
+              <li key={f.id} data-finding={f.category} className="flex flex-col gap-1">
+                <span><SourceBadge source={deterministicSource(f.check)} /></span>
+                <span>
+                  {defangText(f.label)}: {defangText(f.evidence)}
+                </span>
               </li>
             ))}
             {unfinished.map((c) => (
-              <li key={c} data-unfinished={c}>
-                {unfinishedCheckNotice(knownCheckLabel(c) ?? defangText(c))}
+              <li key={c} data-unfinished={c} className="flex flex-col gap-1">
+                <span><SourceBadge source={deterministicSource(c)} /></span>
+                <span>{unfinishedCheckNotice(knownCheckLabel(c) ?? defangText(c))}</span>
               </li>
             ))}
-            {!complete ? <li>{DOMAIN_AGE_SKIPPED_NOTICE}</li> : null}
+            {!complete ? (
+              <li className="flex flex-col gap-1">
+                <span><SourceBadge source="link_checks" /></span>
+                <span>{DOMAIN_AGE_SKIPPED_NOTICE}</span>
+              </li>
+            ) : null}
           </ul>
         ) : (
-          <p className="mt-1 text-sm">None reported.</p>
+          <p className="mt-2 text-sm text-scry-ivory">None reported.</p>
         )}
       </div>
     </section>

@@ -25,6 +25,7 @@ import {
   VerifiedChecks,
 } from "./VerifiedChecks";
 import { NO_SCORED_SUMMARY, WaxSealVerdict, scoredSummary } from "./WaxSealVerdict";
+import { AI_SUMMARY_LABEL, FINDING_WORDING, NO_RULE_FINDINGS_SUMMARY, PLAIN_HEADING } from "@/lib/report/plainLanguage";
 
 // Synthetic fixtures only (.example / .test domains).
 function f(
@@ -175,6 +176,31 @@ describe("VerifiedChecks", () => {
     expect(sub(container, "findings").textContent).toContain(NO_SCORED_FINDINGS_NOTICE);
   });
 
+  it("adds a plain-English explanation to scored evidence only, below the technical details", () => {
+    const { container } = mount(<VerifiedChecks result={complete()} />);
+    const scored = [...sub(container, "findings").querySelectorAll("li")];
+    expect(scored.map((li) => text(li.querySelector("[data-explanation] p:last-child")))).toEqual([
+      FINDING_WORDING.shortener.explanation,
+      FINDING_WORDING.upfront_payment.explanation,
+    ]);
+    for (const li of scored) {
+      // Explanation follows (does not replace) the evidence details.
+      const dl = li.querySelector("dl")!;
+      const ex = li.querySelector("[data-explanation]")!;
+      expect(dl.compareDocumentPosition(ex) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(ex.querySelector("p")!.textContent).toBe(PLAIN_HEADING);
+    }
+    // Context items and checks not performed get no explanation.
+    expect(sub(container, "informational").querySelector("[data-explanation]")).toBeNull();
+    expect(sub(container, "not-performed").querySelector("[data-explanation]")).toBeNull();
+  });
+
+  it("gives no explanation for a scored category without reviewed wording (no invented claims)", () => {
+    const odd = f({ check: "scam_triggers", category: "unreviewed_category", weight: 12 });
+    const { container } = mount(<VerifiedChecks result={complete({ deterministicFindings: [odd] })} />);
+    expect(container.querySelector("[data-explanation]")).toBeNull();
+  });
+
   it("renders only deterministic findings (never AI findings)", () => {
     const { container } = mount(<VerifiedChecks result={complete()} />);
     expect(container.textContent).not.toContain(AI.label);
@@ -323,8 +349,50 @@ describe("WaxSealVerdict", () => {
     expect(container.textContent).not.toMatch(/\/ 100|low risk/i);
   });
 
-  it("seal text is dark ink on parchment (contrast ≥ 4.5:1)", () => {
-    expect(contrastRatio("#1A1614", "#F8F3E6")).toBeGreaterThanOrEqual(4.5);
+  it("never breaks the tier text mid-word, in either layout", () => {
+    for (const compact of [false, true]) {
+      const { container } = mount(<WaxSealVerdict result={complete()} compact={compact} />);
+      const cls = container.querySelector("[data-tier]")!.className;
+      expect(cls).toContain("break-normal");
+      expect(cls).toContain("hyphens-none");
+      expect(cls).not.toMatch(/break-all|break-words/);
+    }
+  });
+
+  it("explains the verdict in plain English from the actual findings, with a labelled AI summary", () => {
+    const { container } = mount(<WaxSealVerdict result={complete()} />);
+    const block = container.querySelector("[data-plain-summary]")!;
+    expect(block.querySelector("h3")!.textContent).toBe(PLAIN_HEADING);
+    expect(text(block.querySelector("[data-plain-rules]"))).toBe(
+      "Scryvorn found patterns that can appear in scams. This message includes a shortened link that can hide its real destination and a request to pay up front. Pause before acting and verify through an official channel.",
+    );
+    const aiLine = text(block.querySelector("[data-plain-ai]"));
+    expect(aiLine).toContain(AI_SUMMARY_LABEL);
+    expect(aiLine).toContain("The model pointed to one pattern: Asks for a one-time code.");
+    expect(block.textContent).not.toMatch(/\bsafe\b|legitimate|fraudulent/i);
+  });
+
+  it("uses the no-findings wording and the exact AI-unavailable notice when applicable", () => {
+    const r = complete({ deterministicFindings: [HTTPS], aiAvailable: false, aiUnavailableReason: "timeout", aiFindings: [AI] });
+    const { container } = mount(<WaxSealVerdict result={r} />);
+    expect(text(container.querySelector("[data-plain-rules]"))).toBe(NO_RULE_FINDINGS_SUMMARY);
+    const aiLine = text(container.querySelector("[data-plain-ai]"));
+    expect(aiLine).toContain("AI analysis unavailable (the AI service did not respond in time).");
+    expect(aiLine).not.toContain(AI.label); // never implies AI ran
+  });
+
+  it("the incomplete panel stays neutral: no plain-English verdict summary", () => {
+    const { container } = mount(<WaxSealVerdict result={incomplete()} />);
+    expect(container.querySelector("[data-plain-summary]")).toBeNull();
+  });
+
+  it("seal and tier text are ivory/muted on the dark card (contrast ≥ 4.5:1); tier colour is supplementary", () => {
+    const { container } = mount(<WaxSealVerdict result={complete()} />);
+    expect(container.querySelector("[data-tier]")!.className).toContain("text-scry-ivory");
+    // The seal label stays on one line inside the ring (no clipping by wrap).
+    expect(container.querySelector("[data-seal-label]")!.className).toContain("whitespace-nowrap");
+    expect(contrastRatio("#EAE2D6", "#110D0F")).toBeGreaterThanOrEqual(4.5);
+    expect(contrastRatio("#A79F94", "#110D0F")).toBeGreaterThanOrEqual(4.5);
   });
 });
 

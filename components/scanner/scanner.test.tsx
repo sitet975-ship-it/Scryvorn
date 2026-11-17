@@ -67,10 +67,13 @@ describe("ScannerInput", () => {
     expect(textarea.hasAttribute("maxlength")).toBe(false); // no silent truncation
     expect(counter.textContent).toBe("0 / 10,000");
     expect(submitButton.textContent).toBe(SUBMIT_LABEL);
-    expect(SUBMIT_LABEL).toBe("Inspect for Traps");
-    expect(submitButton.className).toContain("bg-pumpkin-orange");
-    expect(submitButton.className).toContain("text-dark-ink");
+    expect(SUBMIT_LABEL).toBe("Examine the evidence →");
+    // The arrow is decorative: excluded from the accessible name.
+    expect(submitButton.querySelector('[aria-hidden="true"]')!.textContent).toBe("→");
+    expect(submitButton.className).toContain("bg-scry-crimson");
+    expect(submitButton.className).toContain("text-scry-ivory");
     expect(submitButton.className).toContain("font-bold");
+    expect(submitButton.className).toContain("min-h-[52px]"); // large tap target
   });
 
   it("updates the counter using string length (UTF-16 code units)", () => {
@@ -185,22 +188,22 @@ describe("ScannerInput", () => {
     }
   });
 
-  it("error text is Dark Ink with a Crimson Wax accent border only (never crimson text)", () => {
+  it("error text is ivory with a danger-red accent border only (never red text)", () => {
     const { container } = mount(<Harness />);
     const { error, form } = parts(container);
-    expect(error.className).toContain("text-dark-ink");
-    expect(error.className).not.toContain("text-crimson-wax");
-    expect(error.className).not.toContain("border-crimson-wax"); // no accent while empty
+    expect(error.className).toContain("text-scry-ivory");
+    expect(error.className).not.toContain("text-scry-danger");
+    expect(error.className).not.toContain("border-scry-danger"); // no accent while empty
     submit(form);
     expect(error.textContent).toBe(INPUT_REQUIRED_MESSAGE);
-    expect(error.className).toContain("text-dark-ink");
+    expect(error.className).toContain("text-scry-ivory");
     expect(error.className).toContain("border-l-4");
-    expect(error.className).toContain("border-crimson-wax");
-    expect(error.className).not.toContain("text-crimson-wax");
+    expect(error.className).toContain("border-scry-danger");
+    expect(error.className).not.toContain("text-scry-danger");
     expect(error.getAttribute("role")).toBeNull();
-    // Crimson Wax as text on parchment would miss 4.5:1; Dark Ink passes.
-    expect(contrastRatio("#DC2626", "#F8F3E6")).toBeLessThan(4.5);
-    expect(contrastRatio("#1A1614", "#F8F3E6")).toBeGreaterThanOrEqual(4.5);
+    // Danger red as text on the dark card would miss 4.5:1; ivory passes.
+    expect(contrastRatio("#B91C1C", "#110D0F")).toBeLessThan(4.5);
+    expect(contrastRatio("#EAE2D6", "#110D0F")).toBeGreaterThanOrEqual(4.5);
   });
 
   it.each([
@@ -214,7 +217,7 @@ describe("ScannerInput", () => {
     const { textarea, error } = parts(container);
     expect(error.textContent).toBe(message);
     expect(error.getAttribute("aria-live")).toBe("polite");
-    expect(error.className).toContain("border-crimson-wax");
+    expect(error.className).toContain("border-scry-danger");
     expect(textarea.getAttribute("aria-invalid")).toBe("true");
     expect(textarea.value).toBe("kept text");
   });
@@ -229,13 +232,11 @@ describe("ScannerInput", () => {
     expect(error.textContent).toBe(INPUT_REQUIRED_MESSAGE);
   });
 
-  it("meets 4.5:1 contrast for the submit label (Dark Ink on Pumpkin Orange)", () => {
-    const projectInk = contrastRatio("#1A1614", "#FF5A1F");
-    const requestedInk = contrastRatio("#1C1917", "#FF5A1F");
-    expect(projectInk).toBeGreaterThanOrEqual(4.5);
-    expect(requestedInk).toBeGreaterThanOrEqual(4.5);
-    expect(projectInk.toFixed(2)).toBe("5.76");
-    expect(requestedInk.toFixed(2)).toBe("5.61");
+  it("meets 4.5:1 contrast for the submit label (ivory on primary crimson)", () => {
+    expect(contrastRatio("#EAE2D6", "#9B2626")).toBeGreaterThanOrEqual(4.5);
+    // Amber focus outline is clearly visible on the dark surfaces (3:1 non-text).
+    expect(contrastRatio("#E8892B", "#070709")).toBeGreaterThanOrEqual(3);
+    expect(contrastRatio("#E8892B", "#110D0F")).toBeGreaterThanOrEqual(3);
   });
 });
 

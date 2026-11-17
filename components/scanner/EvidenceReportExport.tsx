@@ -40,7 +40,7 @@ function build(result: ScanResult | null): { report: string; filename: string } 
 }
 
 const BUTTON_CLASS =
-  "rounded border-2 border-dark-ink bg-aged-parchment px-4 py-2 font-semibold text-dark-ink disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pumpkin-orange";
+  "inline-flex min-h-[48px] items-center justify-center rounded-sm border border-scry-amber/60 bg-scry-bg/70 px-5 py-2 font-semibold text-scry-ivory transition hover:border-scry-amber hover:bg-scry-crimson/30 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-scry-amber";
 
 export function EvidenceReportExport({ result }: { result: ScanResult | null }) {
   const built = useMemo(() => build(result), [result]);
@@ -104,7 +104,7 @@ export function EvidenceReportExport({ result }: { result: ScanResult | null }) 
       <p
         aria-live="polite"
         data-export-status={message ? (isError ? "error" : "success") : ""}
-        className={`min-h-5 text-sm font-semibold text-dark-ink ${isError ? "border-l-4 border-crimson-wax pl-2" : ""}`}
+        className={`min-h-5 text-sm font-semibold text-scry-ivory ${isError ? "border-l-4 border-scry-danger pl-2" : ""}`}
       >
         {message}
       </p>

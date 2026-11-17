@@ -37,8 +37,13 @@ A scan or Kiro task is complete only when:
 - Do not retain message text, URLs, screenshots, or scan results unless a deliberate, clearly disclosed feature requires it.
 - Use only synthetic sample data in the demo.
 
-## UI Direction — Autumn Lantern & Enchanted Casebook
-- Avoid cartoon ghosts and generic gray dashboards.
-- Use Moonlit Midnight (#0D1117), Warm Aged Parchment (#F8F3E6), dark ink (#1A1614), Pumpkin Orange (#FF5A1F), Crimson Wax (#DC2626), Potion Emerald (#059669), and Candlelight Gold (#D97706).
-- Use subtle geometric spiderweb accents, a crescent moon/bat navbar motif, and readable wax-seal-style verdict stamps.
+## UI Direction — Haunted Victorian Forensic Laboratory (Halloween edition)
+(Replaces the earlier "Autumn Lantern & Enchanted Casebook" direction, which used Moonlit Midnight, Warm Aged Parchment, dark ink, Pumpkin Orange, Crimson Wax, Potion Emerald, and Candlelight Gold.)
+- A dark gothic cathedral combined with a Victorian monster laboratory and a serious forensic investigation console: cinematic and unmistakably Halloween, but never cartoonish. No cartoon pumpkins, emoji, dripping fonts, or clipart.
+- Palette: background #070709, card #110D0F, border rgba(155,38,38,0.28), primary crimson #9B2626, pumpkin amber #E8892B, laboratory green #4ADE80 / #2F8F5B, ivory text #EAE2D6, muted text #A79F94, danger #B91C1C, success #15803D.
+- Crimson marks danger and verdicts; amber marks atmosphere, investigation, and active states; green marks laboratory energy and AI interpretation. Never put dark text on dark backgrounds; tier text is always ivory.
+- Typography: Cormorant Garamond for serif headings and Inter for body text (next/font, with system fallbacks).
+- Decorations (cathedral, jack-o'-lanterns, cobwebs, tarantula in a dedicated lower lane, descending spider, ghosts, bats, candles, fog, distant vampire, green lab energy during loading) are aria-hidden, ignore pointer input, never cover controls, text, findings, or focus indicators, never cause horizontal scrolling, respect prefers-reduced-motion, and never flash rapidly.
+- Routes: landing page at `/`, inspection app at `/inspect`; every "Examine a message" call to action links to `/inspect`.
+- Never show a fixed verdict ("High risk. Do not engage." or similar). Show only the real Severity_Tier and score from an actual scan result, and only after the scan completes.
 - Prioritize readability, accessibility, and mobile usability over decorative effects.

@@ -1,18 +1,18 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { AdvisoryDisclaimer } from '@/components/scanner/AdvisoryDisclaimer'
-import { Header } from '@/components/theme/Header'
+import { sans, serif } from './fonts'
+import { AppShell } from '@/components/shell/AppShell'
 
 export const metadata: Metadata = {
-  title: 'Scryvorn — Scam Message & Suspicious Link Scanner',
+  title: 'SCRYVORN — Scam Message & Suspicious Link Inspection',
   description:
-    'AI-powered scam-message and suspicious-link forensics scanner. Paste a message or URL to get a risk score, itemized evidence, and verification guidance.',
+    'Paste a suspicious message or link. SCRYVORN examines its text and links, organizes evidence and context, and presents a risk signal and next steps.',
 }
 
 /**
- * Root layout: Header once at the top, page content in <main>, and the
- * AdvisoryDisclaimer once in the footer (pages must not render it again).
- * System font stack via Tailwind defaults; no web fonts are loaded.
+ * Root layout: fonts (next/font, with system fallbacks), the shared shell
+ * (Halloween backdrop, navigation, tarantula lane, footer with the advisory
+ * disclaimer), and page content in <main>.
  */
 export default function RootLayout({
   children,
@@ -20,15 +20,9 @@ export default function RootLayout({
   children: React.ReactNode
 }) {
   return (
-    <html lang="en">
-      <body className="flex min-h-screen flex-col bg-moonlit-midnight text-aged-parchment antialiased">
-        <Header />
-        <main className="flex-1">{children}</main>
-        <footer className="px-4 py-6">
-          <div className="mx-auto max-w-3xl">
-            <AdvisoryDisclaimer />
-          </div>
-        </footer>
+    <html lang="en" className={`${serif.variable} ${sans.variable}`}>
+      <body className="bg-scry-bg font-sans text-scry-ivory antialiased">
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   )

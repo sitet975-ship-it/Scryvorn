@@ -379,6 +379,18 @@ The implementation follows the layered architecture from the design: pure determ
     - `next lint` has no ESLint dependency or configuration.
     - Domain-age lookup remains disabled pending an approved rate-limit and timeout policy.
 
+- [ ] 13. Halloween forensic-laboratory redesign (later design revision; uncommitted, awaiting visual review)
+  - Landing page at `/` (`components/landing/LandingPage.tsx`); the four-state inspection app moved to `/inspect` (`app/inspect/page.tsx`). `/api/scan` is unchanged. Every "Examine a message" call to action links to `/inspect`; "How it works" links to `/#how-it-works` and "About" to `/#about`.
+  - The inspection app keeps the existing ScannerCard state machine and the real backend path (scanClient → POST /api/scan → runDeterministicChecks → runAiInterpretation → assessScan; reports from buildEvidenceReport). The four views (awaiting, examining, revealed, preserved) are derived from that state; the examining view appears only while a real request is in flight. No demo, mock, or hardcoded results are shown.
+  - Results sections: Evidence found, Context observed, Checks not performed (rule-based), AI interpretation, Recommended steps. Every item shows provenance (Message rules, Link checks, or AI interpretation; `lib/report/provenance.ts`). The tier is the real Severity_Tier; the incomplete panel stays neutral.
+  - Revised Req 2.1–2.4, Req 6.2–6.4 (tier accent colors #B91C1C / #E8892B / #15803D), and Req 9.5 (export buttons appear only after a completed scan). Submit label is now "Examine the evidence →". The three sample labels are unchanged.
+  - Decorative Halloween layer (`components/halloween/`): all aria-hidden, focusable="false" on SVGs, pointer-events none, clipped against horizontal overflow, still under prefers-reduced-motion. The tarantula moves in a dedicated lane between main content and the footer.
+  - Fonts: Cormorant Garamond and Inter via next/font/google with system fallbacks. next/font downloads font files at build time; if the build machine has no network access the build may fail rather than silently fall back, so build-time network access is required.
+  - The earlier uncommitted "Midnight Evidence Desk" revision is preserved in git stash "midnight-evidence-desk" and is not part of this redesign.
+  - Plain-English layer (`lib/report/plainLanguage.ts`): a "What this means" summary in the complete verdict and a short explanation on each scored evidence card. Wording is fixed and reviewed per finding category; categories without reviewed wording get no explanation. The AI line uses only the AI findings' own labels, or the exact AI-unavailable notice. Nothing calls a message safe, legitimate, or fraudulent. The incomplete panel has no summary.
+  - Tarantula: one instance walking only reserved space — the bottom lane on small screens, and on wide screens (lg+) a perimeter of the left gutter, bottom lane, and right gutter (main reserves `lg:px-20` gutters). Still at its lane resting position under reduced motion.
+  - Not verified by automated tests: visual quality, real browser focus rings, motion behavior, and screen-reader output.
+
 ## Notes
 
 - Tasks marked with `*` are optional and can be skipped for faster MVP

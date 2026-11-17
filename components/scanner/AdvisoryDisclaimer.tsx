@@ -6,7 +6,7 @@ export function AdvisoryDisclaimer() {
     <aside
       aria-label="Advisory disclaimer"
       data-section="advisory-disclaimer"
-      className="rounded border-l-4 border-candlelight-gold bg-aged-parchment p-3 text-sm text-dark-ink"
+      className="rounded-sm border border-scry-border border-l-4 border-l-scry-amber bg-scry-card p-3 text-sm leading-relaxed text-scry-ivory"
     >
       <p>{ADVISORY_DISCLAIMER}</p>
     </aside>

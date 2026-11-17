@@ -2,26 +2,32 @@
  * ScannerCard state-machine tests (jsdom, mocked fetch).
  *
  * Limits: these tests cannot verify real network behavior, real browser focus,
- * layout (including spiderweb overlap), or responsive rendering.
+ * layout (including decorative overlap), or responsive rendering.
+ * Page and layout composition tests live in app/pages.test.tsx.
  */
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { renderToStaticMarkup } from "react-dom/server";
 import type { AiFinding } from "@/lib/ai/types";
 import type { DeterministicFinding } from "@/lib/checks/types";
 import { ADVISORY_DISCLAIMER, FALLBACK_VERIFICATION_STEPS } from "@/lib/constants";
-import { INCOMPLETE_ASSESSMENT_NOTICE, STEP_SOURCE_LABELS } from "@/lib/report/evidenceReport";
+import { INCOMPLETE_ASSESSMENT_NOTICE, STEP_SOURCE_LABELS, buildEvidenceReport } from "@/lib/report/evidenceReport";
 import { SAMPLE_TRAPS } from "@/lib/samples/sampleTraps";
 import type { CompleteScanResult, IncompleteScanResult } from "@/lib/types";
 import { click, render, submit, typeValue, type Rendered } from "@/test/dom";
-import Home from "@/app/page";
-import RootLayout from "@/app/layout";
 import { AI_PARTIAL_EVIDENCE_NOTICE } from "./AiInterpretation";
 import { COPY_LABEL, DOWNLOAD_LABEL } from "./EvidenceReportExport";
 import { LOADING_TEXT } from "./LoadingState";
-import { GENERIC_SCAN_ERROR, ScannerCard } from "./ScannerCard";
+import {
+  BACK_TO_ASSESSMENT_LABEL,
+  EXAMINING_TITLE,
+  GENERIC_SCAN_ERROR,
+  HEADLINES,
+  NEW_INVESTIGATION_LABEL,
+  ScannerCard,
+  VIEW_REPORT_LABEL,
+} from "./ScannerCard";
 import { INPUT_REQUIRED_MESSAGE, INPUT_TOO_LONG_MESSAGE } from "./ScannerInput";
 import { PARTIAL_FINDINGS_NOTICE } from "./VerifiedChecks";
 
@@ -133,7 +139,16 @@ function ui(c: HTMLElement) {
     results: c.querySelector("[data-results]"),
     sampleButtons: [...c.querySelectorAll('[role="group"] button')] as HTMLButtonElement[],
     exportButtons: [...c.querySelectorAll('[data-section="report-export"] button')] as HTMLButtonElement[],
+    title: c.querySelector("h1")!,
+    view: (c.querySelector("[data-view]") as HTMLElement).dataset.view,
   };
+}
+
+/** Clicks a button by its visible text (arrows included). */
+function press(c: HTMLElement, label: string) {
+  const b = [...c.querySelectorAll("button")].find((x) => x.textContent === label);
+  if (!b) throw new Error(`button not found: ${label}`);
+  click(b as HTMLButtonElement);
 }
 
 async function scanWith(c: HTMLElement, calls: Deferred[], text: string, status: number, body: unknown) {
@@ -146,13 +161,16 @@ async function scanWith(c: HTMLElement, calls: Deferred[], text: string, status:
 }
 
 describe("ScannerCard state machine", () => {
-  it("starts idle with export disabled and no results", () => {
+  it("starts in the awaiting view: no results, no score, and no export offered before a scan", () => {
     const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: controlledFetch().fetchImpl }} />);
     const u = ui(container);
     expect(u.card.dataset.scanState).toBe("idle");
+    expect(u.view).toBe("awaiting");
+    expect(u.title.textContent).toBe(HEADLINES.awaiting.title);
     expect(u.results).toBeNull();
-    expect(u.exportButtons.map((b) => b.textContent)).toEqual([COPY_LABEL, DOWNLOAD_LABEL]);
-    expect(u.exportButtons.every((b) => b.disabled)).toBe(true);
+    expect(container.querySelector("[data-score], [data-tier], [data-verdict]")).toBeNull();
+    // Req 9.5 (revised): copy/download are not offered until a scan completes.
+    expect(u.exportButtons).toHaveLength(0);
   });
 
   it("uses SAMPLE_TRAPS by default and a sample replaces the input", () => {
@@ -175,6 +193,11 @@ describe("ScannerCard state machine", () => {
     expect(u.submitButton.disabled).toBe(true);
     expect(u.sampleButtons.every((b) => b.disabled)).toBe(true);
     expect(JSON.parse(String(f.calls[0].init?.body))).toEqual({ input: "check this" });
+    // Examining view only while the real request is in flight; no score shown.
+    expect(u.view).toBe("examining");
+    expect(container.textContent).toContain(EXAMINING_TITLE);
+    expect(container.querySelector('[data-decorative="lab-energy"]')).not.toBeNull();
+    expect(container.querySelector("[data-score], [data-tier]")).toBeNull();
   });
 
   it("success (complete, AI available): results in the required order, AI-sourced steps, export enabled", async () => {
@@ -183,15 +206,37 @@ describe("ScannerCard state machine", () => {
     await scanWith(container, f.calls, "check this", 200, COMPLETE);
     const u = ui(container);
     expect(u.card.dataset.scanState).toBe("success");
+    expect(u.view).toBe("revealed");
+    expect(u.title.textContent).toBe(HEADLINES.revealed.title);
+    expect(document.activeElement).toBe(u.title); // focus moves to the new view
     expect(u.status.textContent).toBe("");
     const order = [...container.querySelectorAll("[data-section]")].map((e) => e.getAttribute("data-section"));
-    expect(order).toEqual(["verdict", "verified-checks", "ai-interpretation", "recommended-steps", "report-export"]);
+    expect(order).toEqual(["verdict", "verified-checks", "ai-interpretation", "recommended-steps"]);
     expect(container.querySelector('[data-verdict="complete"]')).not.toBeNull();
+    // Tier and score come from the real result, not fixed copy.
+    expect(container.querySelector("[data-tier]")!.textContent).toBe(COMPLETE.severityTier);
+    expect(container.querySelector("[data-score]")!.textContent).toBe(String(COMPLETE.riskScore));
     expect(container.querySelector('[data-ai-state="findings"]')).not.toBeNull();
     expect(container.querySelector("[data-step-source]")!.getAttribute("data-step-source")).toBe("ai");
-    expect(u.exportButtons.every((b) => !b.disabled)).toBe(true);
     expect(u.scanError.textContent).toBe("");
-    expect(u.textarea.value).toBe("check this");
+
+    // Evidence preserved: the exact Evidence_Report text with enabled real export controls.
+    press(container, VIEW_REPORT_LABEL);
+    const r = ui(container);
+    expect(r.view).toBe("preserved");
+    expect(r.title.textContent).toBe(HEADLINES.preserved.title);
+    expect(container.querySelector("[data-report-text]")!.textContent).toBe(buildEvidenceReport(COMPLETE));
+    expect(r.exportButtons.map((b) => b.textContent)).toEqual([COPY_LABEL, DOWNLOAD_LABEL]);
+    expect(r.exportButtons.every((b) => !b.disabled)).toBe(true);
+
+    // Back to the assessment, then a new investigation keeps the input.
+    press(container, BACK_TO_ASSESSMENT_LABEL);
+    expect(ui(container).view).toBe("revealed");
+    press(container, NEW_INVESTIGATION_LABEL);
+    const n = ui(container);
+    expect(n.view).toBe("awaiting");
+    expect(n.textarea.value).toBe("check this");
+    expect(document.activeElement).toBe(n.textarea);
   });
 
   it.each([
@@ -218,7 +263,13 @@ describe("ScannerCard state machine", () => {
     expect(container.textContent).toContain(PARTIAL_FINDINGS_NOTICE);
     expect(container.textContent).toContain(AI_PARTIAL_EVIDENCE_NOTICE);
     expect(container.textContent!.split(INCOMPLETE_ASSESSMENT_NOTICE)).toHaveLength(2); // exactly once
-    expect(ui(container).exportButtons.every((b) => !b.disabled)).toBe(true);
+    expect(container.querySelector("[data-score], [data-tier]")).toBeNull();
+    press(container, VIEW_REPORT_LABEL);
+    const r = ui(container);
+    expect(r.exportButtons).toHaveLength(2);
+    expect(r.exportButtons.every((b) => !b.disabled)).toBe(true);
+    // The report explains the incomplete assessment.
+    expect(container.querySelector("[data-report-text]")!.textContent).toContain(INCOMPLETE_ASSESSMENT_NOTICE);
   });
 
   it("a new scan immediately clears the previous result and keeps the input", async () => {
@@ -226,12 +277,14 @@ describe("ScannerCard state machine", () => {
     const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} />);
     await scanWith(container, f.calls, "first", 200, COMPLETE);
     expect(ui(container).results).not.toBeNull();
+    press(container, NEW_INVESTIGATION_LABEL);
+    expect(ui(container).textarea.value).toBe("first");
     typeValue(ui(container).textarea, "second");
     submit(ui(container).form);
     const u = ui(container);
     expect(u.card.dataset.scanState).toBe("loading");
     expect(u.results).toBeNull();
-    expect(u.exportButtons.every((b) => b.disabled)).toBe(true);
+    expect(u.exportButtons).toHaveLength(0);
     expect(u.textarea.value).toBe("second");
   });
 
@@ -268,8 +321,9 @@ describe("ScannerCard state machine", () => {
     expect(u.scanError.textContent).toBe(GENERIC_SCAN_ERROR);
     expect(u.scanError.getAttribute("aria-live")).toBe("polite");
     expect(u.scanError.getAttribute("role")).toBeNull();
-    expect(u.scanError.className).toContain("text-dark-ink");
-    expect(u.scanError.className).not.toContain("text-crimson-wax");
+    expect(u.scanError.className).toContain("text-scry-ivory");
+    expect(u.scanError.className).not.toContain("text-scry-danger");
+    expect(u.view).toBe("awaiting");
     expect(u.textarea.value).toBe("keep me");
     expect(container.textContent).not.toContain("secret-detail");
     expect(container.textContent).not.toContain("internal_error");
@@ -344,9 +398,14 @@ describe("no persistence", () => {
   it("scan-flow sources reference no persistence API", () => {
     const files = [
       "components/scanner/ScannerCard.tsx",
+      "components/scanner/ResultsPanel.tsx",
+      "components/scanner/EvidenceReportView.tsx",
       "lib/scan/scanClient.ts",
       "app/page.tsx",
+      "app/inspect/page.tsx",
       "app/layout.tsx",
+      "components/landing/LandingPage.tsx",
+      "components/shell/AppShell.tsx",
       "components/scanner/RecommendedSteps.tsx",
       "lib/samples/sampleTraps.ts",
     ];
@@ -357,20 +416,4 @@ describe("no persistence", () => {
   });
 });
 
-describe("page and layout composition (static markup)", () => {
-  it("layout renders Header once, children in main, and the disclaimer once in the footer", () => {
-    const html = renderToStaticMarkup(RootLayout({ children: <p>child</p> }));
-    expect(html.match(/<header/g)).toHaveLength(1);
-    expect(html).toMatch(/<main[^>]*><p>child<\/p><\/main>/);
-    expect(html.split(ADVISORY_DISCLAIMER)).toHaveLength(2);
-    expect(html).toMatch(/<footer[\s\S]*Advisory disclaimer[\s\S]*<\/footer>/);
-  });
 
-  it("page composes ScannerCard and RoadmapSection without a second disclaimer", () => {
-    const html = renderToStaticMarkup(<Home />);
-    expect(html).toContain('data-scan-state="idle"');
-    expect(html).toContain('data-section="roadmap"');
-    expect(html).not.toContain(ADVISORY_DISCLAIMER);
-    expect(html).not.toContain("Scanner coming soon");
-  });
-});

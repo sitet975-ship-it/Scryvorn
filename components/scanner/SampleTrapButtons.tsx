@@ -2,9 +2,8 @@
 
 /**
  * One-click sample buttons. Prop-driven: the sample text is supplied by the
- * caller (production samples are added in Task 9.1). Clicking a button calls
- * `onSelect` with that sample's content, and the caller replaces the
- * textarea content with it.
+ * caller (lib/samples/sampleTraps.ts). Clicking a button calls `onSelect`
+ * with that sample's content, and the caller replaces the textarea content.
  *
  * Labels are restricted by type to the three required sample names.
  */
@@ -38,7 +37,7 @@ export function SampleTrapButtons({ samples, onSelect, disabled = false }: Sampl
           disabled={disabled}
           data-sample-id={sample.id}
           onClick={() => onSelect(sample.content)}
-          className="rounded border border-dark-ink/50 bg-aged-parchment px-3 py-1.5 text-sm font-semibold text-dark-ink hover:bg-white disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pumpkin-orange"
+          className="inline-flex min-h-[44px] items-center rounded-sm border border-scry-border bg-scry-bg/70 px-3 py-2 text-sm font-medium text-scry-ivory transition hover:border-scry-amber/60 hover:text-scry-ivory disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-scry-amber"
         >
           {sample.label}
         </button>

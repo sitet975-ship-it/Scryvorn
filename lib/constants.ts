@@ -1,14 +1,22 @@
 import type { SeverityTier } from "@/lib/types";
 
-/** Autumn Lantern & Enchanted Casebook theme palette. */
+/**
+ * Haunted forensic laboratory palette (approved Halloween redesign).
+ * Crimson: danger and verdicts. Amber: atmosphere, investigation, active
+ * states. Green: laboratory energy and AI interpretation.
+ */
 export const THEME = {
-  moonlitMidnight: "#0D1117",
-  agedParchment: "#F8F3E6",
-  darkInk: "#1A1614",
-  pumpkinOrange: "#FF5A1F",
-  crimsonWax: "#DC2626",
-  candlelightGold: "#D97706",
-  potionEmerald: "#059669",
+  background: "#070709",
+  card: "#110D0F",
+  border: "rgba(155,38,38,0.28)",
+  crimson: "#9B2626",
+  amber: "#E8892B",
+  labGreen: "#4ADE80",
+  labGreenDeep: "#2F8F5B",
+  ivory: "#EAE2D6",
+  muted: "#A79F94",
+  danger: "#B91C1C",
+  success: "#15803D",
 } as const;
 
 /** Maximum characters accepted in the scanner input. */
@@ -52,7 +60,8 @@ export const SCORING_WEIGHTS = {
 /**
  * Severity tiers derived strictly from the Risk_Score.
  * Tiers are advisory: a low score never guarantees safety, and a high
- * score does not conclusively prove fraud.
+ * score does not conclusively prove fraud. Colors are used for rings and
+ * accents only; tier text is always rendered in a light, readable color.
  */
 export const SEVERITY_TIERS: ReadonlyArray<{
   readonly min: number;
@@ -60,9 +69,9 @@ export const SEVERITY_TIERS: ReadonlyArray<{
   readonly tier: SeverityTier;
   readonly color: string;
 }> = [
-  { min: 70, max: 100, tier: "TRAP DETECTED", color: "#DC2626" },
-  { min: 40, max: 69, tier: "Caution — verify before acting", color: "#D97706" },
-  { min: 0, max: 39, tier: "Low risk — still verify independently", color: "#059669" },
+  { min: 70, max: 100, tier: "TRAP DETECTED", color: "#B91C1C" },
+  { min: 40, max: 69, tier: "Caution — verify before acting", color: "#E8892B" },
+  { min: 0, max: 39, tier: "Low risk — still verify independently", color: "#15803D" },
 ];
 
 export const ADVISORY_DISCLAIMER =
