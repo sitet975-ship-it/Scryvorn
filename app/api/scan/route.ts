@@ -20,7 +20,9 @@ import type { InputType, ScanResult } from "@/lib/types";
  * Pipeline: deterministic checks (no domain-age service injected), then the
  * deterministic summary, then AI interpretation (also after an incomplete
  * deterministic run), then assessScan. Unexpected failures return a fixed
- * 500 internal_error body. Nothing is logged. Every response this handler
+ * 500 internal_error body. The handler itself logs nothing; the AI client
+ * writes one content-free diagnostic line per scan (lib/ai/diagnostics.ts).
+ * Every response this handler
  * generates (200, 400, 500) is Cache-Control: no-store; the framework's own
  * 405 and OPTIONS responses do not currently carry that header.
  */

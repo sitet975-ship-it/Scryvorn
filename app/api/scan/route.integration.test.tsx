@@ -87,6 +87,9 @@ const USER_TEXT = `Act now! Pay the processing fee at https://bit.ly/claim-${MAR
 
 const fetchMock = vi.fn();
 let consoleSpies: MockInstance[] = [];
+/** The exact safe AI diagnostic line format (lib/ai/diagnostics.ts). */
+const DIAGNOSTIC_LINE =
+  /^\[scryvorn:ai\] attempted=(true|false) status=(\d{3}|none) category=[a-z_]+ message="[^"\r\n]{1,160}"( providerCode=[a-z][a-z0-9_]{0,47})?$/;
 let stdoutSpy: MockInstance;
 let stderrSpy: MockInstance;
 
@@ -144,7 +147,16 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+  // The only console output allowed is the safe AI diagnostic line (info/warn),
+  // and it never carries the key or the user's text.
+  const [log, info, warn, ...rest] = consoleSpies;
+  for (const spy of [log, ...rest]) expect(spy).not.toHaveBeenCalled();
+  for (const call of [...info.mock.calls, ...warn.mock.calls]) {
+    expect(call).toHaveLength(1);
+    const line = String(call[0]);
+    expect(line).toMatch(DIAGNOSTIC_LINE);
+    for (const secret of [KEY, MARKER, "Bearer", "processing fee"]) expect(line).not.toContain(secret);
+  }
   // Nothing written to stdout/stderr may carry the user's text.
   for (const call of [...stdoutSpy.mock.calls, ...stderrSpy.mock.calls]) {
     expect(String(call[0])).not.toContain(MARKER);
@@ -266,7 +278,15 @@ describe("no persistence and no logging", () => {
     fetchMock.mockResolvedValueOnce(new Response("x", { status: 500 }));
     await scan();
     await route.POST(post(""));
-    // Assertions run in afterEach (console never called; no stdout/stderr write contains MARKER).
+    // Assertions run in afterEach (only safe diagnostic lines; no stdout/stderr write contains MARKER).
     expect(h.events.filter((e) => e === "ai:start")).toHaveLength(2);
+    // One diagnostic per AI call: success (info), HTTP 500 (warn). Validation failures never reach the AI.
+    const [, info, warn] = consoleSpies;
+    expect(info.mock.calls.map((c) => c[0])).toEqual([
+      '[scryvorn:ai] attempted=true status=200 category=none message="AI interpretation succeeded."',
+    ]);
+    expect(warn.mock.calls.map((c) => c[0])).toEqual([
+      '[scryvorn:ai] attempted=true status=500 category=unexpected_response message="The provider returned HTTP 500."',
+    ]);
   });
 });

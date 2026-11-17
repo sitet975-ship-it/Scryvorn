@@ -41,6 +41,9 @@ const USER_TEXT = "Act now! Pay the processing fee at https://bit.ly/claim-4321 
 
 const fetchMock = vi.fn();
 let consoleSpies: MockInstance[] = [];
+/** The exact safe AI diagnostic line format (lib/ai/diagnostics.ts). */
+const DIAGNOSTIC_LINE =
+  /^\[scryvorn:ai\] attempted=(true|false) status=(\d{3}|none) category=[a-z_]+ message="[^"\r\n]{1,160}"( providerCode=[a-z][a-z0-9_]{0,47})?$/;
 
 const AI_CONTENT = {
   findings: [
@@ -89,8 +92,15 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // No path may write to the console.
-  for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+  // The only console output allowed is the safe AI diagnostic line (info/warn).
+  const [log, info, warn, ...rest] = consoleSpies;
+  for (const spy of [log, ...rest]) expect(spy).not.toHaveBeenCalled();
+  for (const call of [...info.mock.calls, ...warn.mock.calls]) {
+    expect(call).toHaveLength(1);
+    expect(String(call[0])).toMatch(DIAGNOSTIC_LINE);
+    expect(String(call[0])).not.toContain(KEY);
+    expect(String(call[0])).not.toContain("Bearer");
+  }
   h.failTriggers = false;
   h.failAssessment = false;
   vi.useRealTimers();

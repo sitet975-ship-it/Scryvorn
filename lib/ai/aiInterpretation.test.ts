@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } from "vitest";
 import { AI_TIMEOUT_MS } from "@/lib/constants";
 import { chatCompletionsEndpoint, runAiInterpretation } from "./aiInterpretation";
 import { buildAiPrompt } from "./prompt";
@@ -16,6 +16,9 @@ const TIMEOUT = { unavailable: true, reason: "timeout" };
 const ERROR = { unavailable: true, reason: "error" };
 
 const fetchMock = vi.fn();
+/** The exact safe AI diagnostic line format (lib/ai/diagnostics.ts). */
+const DIAGNOSTIC_LINE =
+  /^\[scryvorn:ai\] attempted=(true|false) status=(\d{3}|none) category=[a-z_]+ message="[^"\r\n]{1,160}"( providerCode=[a-z][a-z0-9_]{0,47})?$/;
 
 function envelope(content: unknown): Response {
   const text = typeof content === "string" ? content : JSON.stringify(content);
@@ -357,7 +360,15 @@ describe("no leakage", () => {
       expect(serialized).not.toContain("4321");
       expect(serialized).not.toContain("network down");
     }
-    for (const spy of consoleSpies) expect(spy).not.toHaveBeenCalled();
+    // Only the safe diagnostic line is written, and it carries no key, input, or provider text.
+    const [log, info, warn, ...rest] = consoleSpies;
+    for (const spy of [log, ...rest]) expect(spy).not.toHaveBeenCalled();
+    const lines = [...info.mock.calls, ...warn.mock.calls].map((c) => String(c[0]));
+    expect(lines).toHaveLength(3);
+    for (const line of lines) {
+      expect(line).toMatch(DIAGNOSTIC_LINE);
+      for (const secret of [KEY, INPUT, "4321", "network down", "bad key", "Bearer"]) expect(line).not.toContain(secret);
+    }
   });
 
   it("returns the same outcome shape for repeated failures", async () => {
@@ -366,5 +377,99 @@ describe("no leakage", () => {
     const b = await runAiInterpretation("other input", "other summary");
     expect(a).toEqual(ERROR);
     expect(b).toEqual(a);
+  });
+});
+
+describe("safe server diagnostics", () => {
+  const P = "[scryvorn:ai]";
+  let info: MockInstance;
+  let warn: MockInstance;
+  beforeEach(() => {
+    info = vi.spyOn(console, "info").mockImplementation(() => {});
+    warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  });
+  const lines = () => [...info.mock.calls, ...warn.mock.calls].map((c) => String(c[0]));
+  const errorBody = (status: number, code: string) =>
+    new Response(JSON.stringify({ error: { message: `secret detail ${KEY} ${INPUT}`, type: "invalid_request_error", code } }), {
+      status,
+    });
+
+  it.each([
+    [401, "invalid_api_key", `${P} attempted=true status=401 category=unauthorized message="The provider rejected the API key (check AI_API_KEY)." providerCode=invalid_api_key`],
+    [403, "permission_denied", `${P} attempted=true status=403 category=forbidden message="The provider refused access for this key or model." providerCode=permission_denied`],
+    [404, "model_not_found", `${P} attempted=true status=404 category=not_found message="The endpoint or model was not found (check AI_API_BASE_URL and AI_MODEL)." providerCode=model_not_found`],
+    [429, "rate_limit_exceeded", `${P} attempted=true status=429 category=rate_limited message="The provider rate limit or quota was reached." providerCode=rate_limit_exceeded`],
+    [400, "json_validate_failed", `${P} attempted=true status=400 category=invalid_request message="The provider rejected the request format or parameters." providerCode=json_validate_failed`],
+    [503, "Not A Token!", `${P} attempted=true status=503 category=unexpected_response message="The provider returned HTTP 503." providerCode=invalid_request_error`],
+  ])("HTTP %i is logged by category, with only a short provider code", async (status, code, expected) => {
+    fetchMock.mockResolvedValueOnce(errorBody(status, code));
+    expect(await runAiInterpretation(INPUT, SUMMARY)).toEqual(ERROR);
+    expect(lines()).toEqual([expected]);
+    expect(warn).toHaveBeenCalledTimes(1);
+  });
+
+  it("logs success at info level", async () => {
+    fetchMock.mockResolvedValueOnce(envelope(VALID));
+    await runAiInterpretation(INPUT, SUMMARY);
+    expect(info.mock.calls).toEqual([[`${P} attempted=true status=200 category=none message="AI interpretation succeeded."`]]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["markdown-fenced JSON", envelope("```json\n" + JSON.stringify(VALID) + "\n```"), "Model content is not valid JSON: it is wrapped in a markdown code fence."],
+    ["prose", envelope(`Here is my analysis of ${INPUT}`), "Model content is not valid JSON."],
+    ["an extra top-level key", envelope({ ...VALID, notes: "x" }), "Model JSON is not an object with exactly the keys findings and recommendedSteps."],
+    ["a capitalized severity", envelope({ ...VALID, findings: [{ ...VALID.findings[0], severity: "High" }] }), "Model finding 0 has a blank or non-string field, or a severity other than low, medium, or high."],
+    ["a non-JSON body", new Response("<html>", { status: 200 }), "Response body is not JSON."],
+    ["no message content", new Response(JSON.stringify({ choices: [] }), { status: 200 }), "Response has no choices[0].message.content string."],
+  ])("explains an unusable 2xx response (%s) without logging its content", async (_name, res, message) => {
+    fetchMock.mockResolvedValueOnce(res);
+    expect(await runAiInterpretation(INPUT, SUMMARY)).toEqual(ERROR);
+    expect(lines()).toEqual([`${P} attempted=true status=200 category=unexpected_response message="${message}"`]);
+  });
+
+  it("logs network errors with only a system error code", async () => {
+    fetchMock.mockRejectedValueOnce(Object.assign(new TypeError(`fetch failed ${KEY}`), { cause: { code: "ENOTFOUND", hostname: "x" } }));
+    await runAiInterpretation(INPUT, SUMMARY);
+    expect(lines()).toEqual([`${P} attempted=true status=none category=network_error message="Request failed before a response was received (ENOTFOUND)."`]);
+  });
+
+  it("logs timeouts as network errors", async () => {
+    fetchMock.mockImplementationOnce(hangingFetch);
+    expect(await runAiInterpretation(INPUT, SUMMARY, { timeoutMs: 20 })).toEqual(TIMEOUT);
+    expect(lines()).toEqual([`${P} attempted=true status=none category=network_error message="Request timed out after 20 ms."`]);
+  });
+
+  it("logs missing or invalid configuration by variable name only, without attempting a request", async () => {
+    vi.stubEnv("AI_API_KEY", "");
+    vi.stubEnv("AI_MODEL", "");
+    vi.stubEnv("AI_API_BASE_URL", "http://api.example.test/v1");
+    expect(await runAiInterpretation(INPUT, SUMMARY)).toEqual(ERROR);
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(lines()).toEqual([
+      `${P} attempted=false status=none category=not_configured message="AI_API_KEY is missing; AI_MODEL is missing; AI_API_BASE_URL is not a usable https URL."`,
+    ]);
+  });
+
+  it("never logs the key, headers, request body, input, or provider text on any path", async () => {
+    const paths: Array<() => Promise<Response>> = [
+      async () => envelope(VALID),
+      async () => errorBody(401, "invalid_api_key"),
+      async () => envelope(`not json ${INPUT}`),
+      async () => {
+        throw new Error(`boom ${KEY} ${INPUT}`);
+      },
+    ];
+    for (const make of paths) {
+      fetchMock.mockImplementationOnce(make);
+      await runAiInterpretation(INPUT, SUMMARY);
+    }
+    expect(lines()).toHaveLength(4);
+    for (const line of lines()) {
+      expect(line).toMatch(DIAGNOSTIC_LINE);
+      for (const secret of [KEY, "Bearer", "Authorization", INPUT, "4321", "secret detail", "boom", MODEL, SUMMARY]) {
+        expect(line).not.toContain(secret);
+      }
+    }
   });
 });
