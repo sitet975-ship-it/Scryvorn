@@ -1,4 +1,4 @@
-import { CandleCluster, Fog } from "@/components/halloween/CandleFog";
+import { Candle, Fog } from "@/components/halloween/CandleFog";
 import { HalloweenBackdrop, MobileAtmosphere } from "@/components/halloween/HalloweenBackdrop";
 import { JackOLantern } from "@/components/halloween/JackOLantern";
 import { TarantulaLane, TarantulaPerimeter } from "@/components/halloween/Tarantula";
@@ -30,12 +30,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 lg:px-20">{children}</main>
           <TarantulaLane>
             <Fog className="h-full" />
-            <div className="absolute bottom-1 left-2 flex items-end gap-1 sm:left-6">
-              <JackOLantern id="lane-jol-l" width={64} />
-              <CandleCluster id="lane-cand-l" scale={0.5} className="hidden sm:flex" />
+            {/*
+              One candle and one lantern, at opposite ends, below lg only: on wide
+              screens the backdrop already has a lantern and a candle group at the
+              pillar bases, so the lane stays clear and nothing repeats.
+            */}
+            <div className="absolute bottom-1 left-3 sm:left-6 lg:hidden">
+              <Candle id="lane-cand-l" height={58} wax={0.6} />
             </div>
-            <div className="absolute bottom-1 right-2 flex items-end gap-1 sm:right-6">
-              <CandleCluster id="lane-cand-r" scale={0.5} className="hidden sm:flex" />
+            <div className="absolute bottom-1 right-2 sm:right-6 lg:hidden">
               <JackOLantern id="lane-jol-r" width={56} face="fangs" />
             </div>
           </TarantulaLane>

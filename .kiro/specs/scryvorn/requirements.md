@@ -149,7 +149,7 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 #### Acceptance Criteria
 
 1. WHEN the scan page is loaded, THE Scryvorn SHALL display an advisory disclaimer stating that Scryvorn provides risk signals and verification guidance, not financial, legal, or law-enforcement advice.
-2. THE Scryvorn SHALL NOT persist user messages, URLs, screenshots, or scan results in any database or client-side storage, and SHALL retain them only in application memory for the duration of the scan page session, defined as the period from when the scan page is loaded until the user navigates away from or refreshes the scan page.
+2. *(Revised: Saved Investigations, Requirement 12. Except for that disclosed, browser-only feature, the original rule applies.)* THE Scryvorn SHALL NOT persist user messages, URLs, screenshots, or scan results in any database or client-side storage, and SHALL retain them only in application memory for the duration of the scan page session, defined as the period from when the scan page is loaded until the user navigates away from or refreshes the scan page.
 3. IF a user navigates away from or refreshes the scan page, THEN THE Scryvorn SHALL clear the current Scanner_Input and scan results from application memory.
 4. THE Scryvorn SHALL NOT write user inputs, extracted URLs, scan results, or Evidence_Report contents to server logs, analytics services, databases, files, or third-party storage.
 5. THE Scryvorn SHALL exclude all user-supplied message text, URLs, and scan results from operational error logs.
@@ -161,15 +161,15 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 #### Acceptance Criteria
 
 1. WHEN a user clicks the "Copy Evidence Report" button, THE Scryvorn SHALL copy the full Evidence_Report text to the system clipboard and SHALL display a confirmation indicating the copy succeeded.
-2. WHEN a user clicks the "Download Report (.md)" button, THE Scryvorn SHALL download the Evidence_Report as a Markdown file whose filename includes the scan timestamp.
+2. *(Revised.)* WHEN a user clicks "Download Report (PDF)", THE Scryvorn SHALL download the Evidence_Report as a PDF file; WHEN a user clicks "Download Report (.txt)", it SHALL download the same report as plain text. Both filenames include the scan timestamp. The displayed, copied, PDF, and .txt reports SHALL show no Markdown syntax (no "#" heading markers, "**", or escape backslashes) and SHALL have the same wording, which is derived from the reviewed Markdown Evidence_Report (criteria 7–10 still govern its content and escaping). IF a character cannot be represented in the PDF, THEN the PDF and the UI SHALL say so and point to the exact .txt report; no format is substituted silently.
 3. THE Evidence_Report SHALL include the scan timestamp, input type, Risk_Score and Severity_Tier (or, for an incomplete assessment, the incomplete notice from Requirement 6.9 in their place), deterministic findings, AI findings, recommended verification steps, and the advisory disclaimer.
 4. WHEN the AI_Interpretation_Engine is unavailable, THE Evidence_Report SHALL include the deterministic findings and an explicit "AI analysis unavailable" notice, SHALL NOT display any supplied AI findings, and SHALL still be generated.
-5. WHILE no scan has completed, THE Scryvorn SHALL NOT enable the "Copy Evidence Report" and "Download Report (.md)" buttons. *(Halloween redesign: the buttons are offered only in the "Evidence, preserved." view, which exists only after a completed scan; before that they are not rendered at all.)*
+5. WHILE no scan has completed, THE Scryvorn SHALL NOT enable the "Copy Evidence Report" and download buttons. *(Halloween redesign: the buttons are offered only in the "Evidence, preserved." view, which exists only after a completed scan; before that they are not rendered at all.)*
 6. IF a copy or download operation fails, THEN THE Scryvorn SHALL display an error notice indicating the export failed and SHALL preserve the Evidence_Report so the user can retry.
 7. THE Evidence_Report SHALL use these distinct sections, in order: "Assessment status and coverage", "Scored deterministic findings", "Informational context", "Checks not performed / unavailable", "AI interpretation", "Recommended verification steps", and "Advisory disclaimer". HTTPS status and elevated-attention TLD findings SHALL appear under "Informational context"; domain-age unavailability and interrupted required checks SHALL appear under "Checks not performed / unavailable". THE Evidence_Report SHALL NOT describe absent findings as proof of safety.
 8. WHILE lookalike checking is inactive, THE Evidence_Report SHALL state "Lookalike checking was not performed because no reviewed reference list is configured. This is not a passed check." WHILE a reference list is configured, THE Evidence_Report SHALL describe lookalike checking as configured, not as proof that it ran.
 9. THE Evidence_Report SHALL treat finding labels, evidence, matched text, URLs, AI text, and recommended steps as untrusted content: it SHALL escape Markdown and HTML syntax in them, SHALL defang URL and domain strings in them, and SHALL NOT emit raw HTML, Markdown links, images, or autolinks from them. Viewer-specific automatic linking cannot be guaranteed absent in every Markdown viewer.
-10. THE Evidence_Report and its filename SHALL use the scan timestamp in UTC, with the filename `scryvorn-report-YYYYMMDD-HHmmss.md`. IF the scan timestamp is not a valid ISO 8601 date-time with an explicit UTC marker or numeric offset, THEN THE Scryvorn SHALL reject it with an error and SHALL NOT substitute the current time.
+10. THE Evidence_Report and its filename SHALL use the scan timestamp in UTC, with the filename `scryvorn-report-YYYYMMDD-HHmmss.md` (downloads use the same name with `.pdf` or `.txt`). IF the scan timestamp is not a valid ISO 8601 date-time with an explicit UTC marker or numeric offset, THEN THE Scryvorn SHALL reject it with an error and SHALL NOT substitute the current time.
 11. IF the AI_Interpretation_Engine is unavailable or returns no recommended steps, THEN THE Scryvorn SHALL use a fixed, reviewed list of fallback verification steps. All steps SHALL be labeled as recommendations for the user, not as verification Scryvorn performed, and THE Scryvorn SHALL NOT claim it visited or confirmed any destination.
 
 ### Requirement 10: Landing-Page Roadmap
@@ -200,3 +200,16 @@ Scryvorn is an AI-powered scam-message and suspicious-link forensics scanner bui
 10. THE Scryvorn SHALL NOT enable a production domain-age lookup service until an approved, bounded lookup policy exists (Design: "Domain-age lookup timing").
 
 > **Implementation status note:** the former Cloudflare Pages adapter and its configuration have been removed. Node.js 24 is pinned for Netlify builds through `.nvmrc`; local development currently uses Node 26, and the pin does not guarantee identical behavior between the two.
+
+### Requirement 12: Saved Investigations (disclosed, browser-only)
+
+**User Story:** As a Kiroween judge, I want my completed investigations kept in my browser, so that I can leave, come back, and review what I examined without signing in.
+
+#### Acceptance Criteria
+
+1. WHEN a scan completes with a valid result, THE Scryvorn SHALL save it automatically in the browser's localStorage only, with the submitted message or URL, the full scan result (findings, AI interpretation, Risk_Score, Severity_Tier, timestamps), the plain-text Evidence_Report, and the time it was saved. Nothing SHALL be sent to or stored on a server, and no account SHALL be required.
+2. THE Scryvorn SHALL show, before and after saving, a visible notice that investigations including the submitted text are stored only in the current browser, are not sent anywhere, and stay until deleted.
+3. THE Scryvorn SHALL list saved investigations (newest first) with their scan time, tier and score (or the incomplete notice), and a defanged excerpt, and SHALL let the user open any of them in the same results and report views, delete one, or clear all after confirmation.
+4. THE Scryvorn SHALL keep at most 25 saved investigations, dropping the oldest first, and SHALL continue to work (without saving) if browser storage is unavailable, full, or blocked, telling the user when an investigation could not be saved.
+5. THE Scryvorn SHALL skip, and never render, saved entries that are malformed or tampered with.
+6. Only `lib/storage/savedInvestigations.ts` SHALL access Web Storage. No cookies, sessionStorage, IndexedDB, or server-side storage SHALL be used.

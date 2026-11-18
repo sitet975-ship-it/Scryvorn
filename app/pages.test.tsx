@@ -82,10 +82,29 @@ describe("root layout", () => {
     const anchors = doc.querySelectorAll("[data-tarantula-anchor]");
     expect(anchors).toHaveLength(1);
     const cls = anchors[0].className;
-    expect(cls).toContain("left-[20%]");
+    // The resting pose (scry-tarantula-rest, see the CSS tests) places it at 20% in the lane.
+    expect(cls).toContain("scry-tarantula-rest");
+    expect(cls).toContain("left-0 top-0");
     expect(cls).not.toMatch(/-left-|left-\[-/); // never starts off-screen
     expect(doc.querySelectorAll('svg[data-decorative="tarantula"]')).toHaveLength(1);
+    expect(doc.querySelectorAll('svg[data-decorative="tarantula-legs"]')).toHaveLength(1);
     expect(html.match(/id="tar-abdomen"/g)).toHaveLength(1); // no duplicated gradient ids
+    // The walking zone is a size container so the walk can use container units.
+    expect(doc.querySelector('[data-decorative="tarantula-zone"]')!.className).toContain("[container-type:size]");
+  });
+
+  it("draws the tarantula as a static filtered body over an animated, filter-free leg layer", () => {
+    const anchor = doc.querySelector("[data-tarantula-anchor]")!;
+    const legs = anchor.querySelector('svg[data-decorative="tarantula-legs"]')!;
+    const body = anchor.querySelector('svg[data-decorative="tarantula"]')!;
+    // Legs come first (underneath), carry the gait, and have no filters.
+    expect(legs.compareDocumentPosition(body) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(legs.querySelectorAll(".scry-gait-a, .scry-gait-b")).toHaveLength(8);
+    expect(legs.querySelector("[filter]")).toBeNull();
+    // The body is not animated.
+    expect(body.querySelector('[class*="scry-"]')).toBeNull();
+    // No CSS blur filters on the moving anchor's children.
+    for (const el of anchor.querySelectorAll("[style]")) expect(el.getAttribute("style")).not.toMatch(/filter/);
   });
 
   it("sizes the tarantula box so even its mid-turn pose stays inside the lane", () => {
@@ -99,7 +118,8 @@ describe("root layout", () => {
     expect(laneCls).toContain(" h-40 "); // 160 px on mobile
     expect(laneCls).toContain(" sm:h-44 "); // 176 px from sm
     expect(laneCls).toContain(" lg:h-40 ");
-    expect(cls).toContain("top-[calc(100%-var(--tar-box)-var(--tar-lift))]");
+    // The lift is applied by the resting pose and the lane-walk keyframes (see the CSS tests).
+    expect(cls).toContain("[--tar-lift:28px]");
 
     const px = (re: RegExp) => Number(cls.match(re)![1]);
     // Lane walk (below lg): at any rotation the box's bounding box is at most
@@ -126,18 +146,58 @@ describe("root layout", () => {
     expect(strip.className).toContain("sm:hidden");
     expect(strip.className).toContain("overflow-hidden");
     expect(strip.closest("main")).toBeNull();
-    for (const name of ["jack-o-lantern", "bat", "ghost", "cobweb", "candle", "fog"]) {
+    for (const name of ["tracery", "bat", "ghost", "candle", "fog"]) {
       expect(strip.querySelector(`[data-decorative="${name}"]`), name).not.toBeNull();
     }
+    // Ghosts on both sides; the lantern lives in the bottom lane instead (no repetition).
+    expect(strip.querySelectorAll('[data-decorative="ghost"]')).toHaveLength(2);
+    expect(strip.querySelector('[data-decorative="jack-o-lantern"]')).toBeNull();
+    expect(strip.querySelector('[data-decorative="cobweb"]')).toBeNull();
     expect(strip.querySelector("a, button, input, textarea, select, [tabindex]")).toBeNull();
   });
 
   it("includes every approved Halloween element", () => {
-    for (const name of ["cathedral", "ghosts", "bats", "cobweb", "descending-spider", "jack-o-lantern", "candle", "fog", "tarantula"]) {
+    for (const name of ["cathedral", "tracery", "gargoyle", "ghosts", "bats", "descending-spider", "jack-o-lantern", "candle", "fog", "tarantula"]) {
       expect(doc.querySelector(`[data-decorative="${name}"]`), name).not.toBeNull();
     }
-    // The vampire silhouette lives inside the cathedral artwork.
-    expect(doc.querySelector('[data-decorative="cathedral"]')!.innerHTML).toContain("#B91C1C");
+  });
+
+  it("has no caped vampire figures, and gothic stonework instead of cathedral cobwebs", () => {
+    const backdrop = doc.querySelector('[data-decorative="halloween-backdrop"]')!;
+    expect(backdrop.innerHTML).not.toMatch(/vampire/i);
+    expect(backdrop.innerHTML).not.toContain("#B91C1C"); // the vampires' red eyes and collar
+    expect(backdrop.querySelector('[data-decorative="cobweb"]')).toBeNull();
+    expect(backdrop.querySelectorAll('[data-decorative="tracery"]')).toHaveLength(2);
+    expect(backdrop.querySelectorAll('[data-decorative="gargoyle"]')).toHaveLength(2);
+  });
+
+  it("spreads ghosts across both sides of the screen", () => {
+    const sides = [...doc.querySelectorAll('[data-decorative="ghosts"] [data-ghost-side]')].map((g) => g.getAttribute("data-ghost-side"));
+    expect(sides.filter((s) => s === "left")).toHaveLength(2);
+    expect(sides.filter((s) => s === "right")).toHaveLength(2);
+  });
+
+  it("flies each bat on its own path, with its own wingbeat", () => {
+    const flights = [...doc.querySelectorAll('[data-decorative="bats"] [data-bat-flight]')].map((b) => b.getAttribute("data-bat-flight"));
+    expect(flights).toHaveLength(6);
+    expect(new Set(flights).size).toBe(6);
+    const flaps = [...html.matchAll(/--flap:([\d.]+)s/g)].map((m) => Number(m[1]));
+    expect(flaps.length).toBeGreaterThanOrEqual(9);
+    expect(new Set(flaps).size).toBeGreaterThan(4); // not in unison
+    for (const f of flaps) expect(f).toBeGreaterThanOrEqual(0.9); // slow cycles only
+  });
+
+  it("does not repeat lanterns and candles in the same area", () => {
+    const lane = doc.querySelector('[data-decorative="tarantula-lane"]')!;
+    expect(lane.querySelectorAll('[data-decorative="jack-o-lantern"]')).toHaveLength(1);
+    expect(lane.querySelectorAll('[data-decorative="candle"]')).toHaveLength(1);
+    // Lane decorations are hidden on wide screens, where the backdrop has its own.
+    for (const el of lane.querySelectorAll("div.absolute")) {
+      if (el.querySelector('[data-decorative="jack-o-lantern"], [data-decorative="candle"]')) expect(el.className).toContain("lg:hidden");
+    }
+    const backdrop = doc.querySelector('[data-decorative="halloween-backdrop"]')!;
+    expect(backdrop.querySelectorAll(':scope > div [data-decorative="jack-o-lantern"]')).toHaveLength(1);
+    expect(backdrop.querySelectorAll('[data-decorative="candles"]')).toHaveLength(1);
   });
 });
 
@@ -227,24 +287,54 @@ describe("motion safety (CSS source)", () => {
     return css.slice(start, next === -1 ? undefined : next);
   };
 
-  it("the small-screen lane walk starts and ends at the visible resting position", () => {
-    const body = keyframes("scry-lane-walk");
-    expect(body).toMatch(/0%,\s*4%\s*\{\s*left:\s*20%/);
-    expect(body).toMatch(/100%\s*\{\s*left:\s*20%/);
-    // Turns around at both ends of the lane (walks right, then left), 20 px in from each edge.
-    expect(body).toMatch(/rotate\(180deg\)/);
-    expect(body).toMatch(/44%\s*\{\s*left:\s*calc\(96% - var\(--tar-w\) - 20px\);\s*transform:\s*rotate\(180deg\)/);
-    expect(body).toMatch(/88%\s*\{\s*left:\s*calc\(4% \+ 20px\);\s*transform:\s*rotate\(360deg\)/);
+  const LANE_Y = "calc(100cqh - var(--tar-box) - var(--tar-lift))";
+  const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+  it("rests the tarantula in the lane 20% from the left (also the reduced-motion pose), with a fallback", () => {
+    const rest = css.indexOf(".scry-tarantula-rest {");
+    expect(rest).toBeGreaterThan(-1);
+    expect(rest).toBeLessThan(css.indexOf("@media (prefers-reduced-motion: no-preference)")); // applies without motion
+    expect(css).toContain(`.scry-tarantula-rest { transform: translate(20cqw, ${LANE_Y}); }`);
+    // Browsers without container units: same pose with left/top, and no walk.
+    expect(css).toMatch(/@supports not \(width: 1cqw\) \{\s*\.scry-tarantula-rest \{ left: 20%; top: calc\(100% - var\(--tar-box\) - var\(--tar-lift\)\); transform: none; \}/);
+    expect(css).toMatch(/@supports not \(width: 1cqw\) \{\s*\.scry-tarantula-walk \{ animation: none; \}/);
   });
 
-  it("the wide-screen walk travels the perimeter: left gutter, bottom lane, right gutter", () => {
+  it("the small-screen lane walk starts and ends at the visible resting position, animating only transform", () => {
+    const body = keyframes("scry-lane-walk");
+    expect(body).toMatch(new RegExp(`0%,\\s*4%\\s*\\{\\s*transform:\\s*translate\\(20cqw, ${esc(LANE_Y)}\\) rotate\\(0deg\\)`));
+    expect(body).toMatch(new RegExp(`100%\\s*\\{\\s*transform:\\s*translate\\(20cqw, ${esc(LANE_Y)}\\) rotate\\(360deg\\)`));
+    // Turns around at both ends of the lane (walks right, then left), 20 px in from each edge.
+    expect(body).toContain(`44% { transform: translate(calc(96cqw - var(--tar-w) - 20px), ${LANE_Y}) rotate(180deg); }`);
+    expect(body).toContain(`88% { transform: translate(calc(4cqw + 20px), ${LANE_Y}) rotate(360deg); }`);
+    expect(body).not.toMatch(/\b(left|top):/); // compositor-only motion
+  });
+
+  it("the wide-screen walk travels the perimeter: left gutter, bottom lane, right gutter, animating only transform", () => {
     expect(css).toMatch(/@media \(min-width: 1024px\)\s*\{\s*\.scry-tarantula-walk\s*\{\s*animation:\s*scry-perimeter/);
     const body = keyframes("scry-perimeter");
-    expect(body).toMatch(/left:\s*-16px;\s*top:\s*2%/); // left gutter, top
-    expect(body).toMatch(/left:\s*calc\(100% - var\(--tar-w\) \+ 16px\);\s*top:\s*2%/); // right gutter, top
-    expect(body).toMatch(/top:\s*calc\(100% - var\(--tar-box\) - 8px\)/); // bottom lane
+    expect(body).toContain("translate(-16px, 2cqh)"); // left gutter, top
+    expect(body).toContain("translate(calc(100cqw - var(--tar-w) + 16px), 2cqh)"); // right gutter, top
+    expect(body).toContain("calc(100cqh - var(--tar-box) - 8px)"); // bottom lane
     // Faces its direction of travel: down, right, up, left.
     for (const deg of ["90deg", "0deg", "-90deg", "180deg"]) expect(body).toContain(`rotate(${deg})`);
+    expect(body).not.toMatch(/\b(left|top):/);
+  });
+
+  it("animates decorations with transform and opacity only (no layout, filter, or shadow animation)", () => {
+    const frames = css.slice(css.indexOf("@keyframes"));
+    const props = new Set([...frames.matchAll(/\{\s*([^{}]*)\}/g)].flatMap((m) => [...m[1].matchAll(/([a-z-]+)\s*:/g)].map((p) => p[1])));
+    for (const p of props) expect(["transform", "opacity", "stroke-dashoffset"], p).toContain(p);
+  });
+
+  it("gives each bat its own flight keyframes, in both directions", () => {
+    const ltr = keyframes("scry-bat-wave-ltr");
+    const rtl = keyframes("scry-bat-dip-rtl");
+    expect(ltr).toMatch(/0%\s*\{\s*transform:\s*translate\(-12vw/);
+    expect(rtl).toMatch(/0%\s*\{\s*transform:\s*translate\(112vw/);
+    for (let i = 1; i <= 6; i++) expect(css).toMatch(new RegExp(`\\.scry-bat-${i} \\{ animation: scry-bat-[a-z-]+ \\d+s`));
+    const names = [...css.matchAll(/\.scry-bat-\d \{ animation: (scry-bat-[a-z-]+)/g)].map((m) => m[1]);
+    expect(new Set(names).size).toBe(6);
   });
 
   it("the ambient radar and panel glow is static by default and only pulses with motion allowed", () => {

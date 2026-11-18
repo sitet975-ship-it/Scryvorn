@@ -18,7 +18,7 @@ inclusion: always
 
 ## Report Requirements
 - Support one-click “Copy Evidence Report.”
-- Support download as `.txt` or `.md`.
+- Support download as a PDF and as `.txt` (plain text, no Markdown symbols). The PDF is generated in the browser by `lib/report/pdf.ts` with no dependencies; if a character cannot be shown in the PDF, the PDF and the UI say so and point to the exact `.txt` report.
 - Include scan timestamp, input type, risk score, severity, evidence items, verification status, recommended actions, and an advisory disclaimer.
 - The report must remain useful even if AI analysis is unavailable.
 

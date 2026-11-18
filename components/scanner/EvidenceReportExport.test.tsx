@@ -11,7 +11,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { ADVISORY_DISCLAIMER, FALLBACK_VERIFICATION_STEPS } from "@/lib/constants";
-import { buildEvidenceReport, reportFilename } from "@/lib/report/evidenceReport";
+import { buildPlainTextReport, reportFilenameWithExtension } from "@/lib/report/reportDocument";
 import type { CompleteScanResult, IncompleteScanResult } from "@/lib/types";
 import { render, type Rendered } from "@/test/dom";
 import {
@@ -20,8 +20,10 @@ import {
   COPY_LABEL,
   COPY_SUCCESS,
   DOWNLOAD_FAILURE,
-  DOWNLOAD_LABEL,
+  DOWNLOAD_PDF_LABEL,
+  DOWNLOAD_TXT_LABEL,
   EvidenceReportExport,
+  PDF_SUBSTITUTION_STATUS,
   downloadStarted,
 } from "./EvidenceReportExport";
 
@@ -108,8 +110,18 @@ function buttons(c: HTMLElement) {
   const all = [...c.querySelectorAll("button")];
   return {
     copy: all.find((b) => b.textContent === COPY_LABEL)!,
-    download: all.find((b) => b.textContent === DOWNLOAD_LABEL)!,
+    pdf: all.find((b) => b.textContent === DOWNLOAD_PDF_LABEL)!,
+    txt: all.find((b) => b.textContent === DOWNLOAD_TXT_LABEL)!,
   };
+}
+/** Reads a Blob's raw bytes as a Latin-1 string (for the PDF). */
+function readBlobBytes(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(Array.from(new Uint8Array(reader.result as ArrayBuffer), (c) => String.fromCharCode(c)).join(""));
+    reader.onerror = () => reject(reader.error);
+    reader.readAsArrayBuffer(blob);
+  });
 }
 /** Reads a Blob with FileReader (available in jsdom). */
 function readBlob(blob: Blob): Promise<string> {
@@ -130,16 +142,15 @@ async function clickAsync(el: HTMLElement) {
 }
 
 describe("EvidenceReportExport", () => {
-  it("disables both buttons until a scan result exists", () => {
+  it("disables all three buttons until a scan result exists", () => {
     const r = mount(<EvidenceReportExport result={null} />);
     let b = buttons(r.container);
-    expect(b.copy.disabled).toBe(true);
-    expect(b.download.disabled).toBe(true);
+    for (const btn of Object.values(b)) expect(btn.disabled).toBe(true);
     expect(b.copy.type).toBe("button");
     r.rerender(<EvidenceReportExport result={RESULT} />);
     b = buttons(r.container);
-    expect(b.copy.disabled).toBe(false);
-    expect(b.download.disabled).toBe(false);
+    for (const btn of Object.values(b)) expect(btn.disabled).toBe(false);
+    expect([...r.container.querySelectorAll("button")].map((x) => x.textContent)).toEqual([COPY_LABEL, DOWNLOAD_PDF_LABEL, DOWNLOAD_TXT_LABEL]);
   });
 
   it("buttons are native, focusable, and have a visible focus style class", () => {
@@ -150,13 +161,17 @@ describe("EvidenceReportExport", () => {
     }
   });
 
-  it("copies exactly buildEvidenceReport(result) and confirms", async () => {
+  it("copies exactly the plain-text report (no Markdown symbols) and confirms", async () => {
     const writeText = vi.fn((_text: string) => Promise.resolve());
     setClipboard({ writeText });
     const { container } = mount(<EvidenceReportExport result={RESULT} />);
     await clickAsync(buttons(container).copy);
     expect(writeText).toHaveBeenCalledTimes(1);
-    expect(writeText).toHaveBeenCalledWith(buildEvidenceReport(RESULT));
+    expect(writeText).toHaveBeenCalledWith(buildPlainTextReport(RESULT));
+    const copied = String(writeText.mock.calls[0][0]);
+    expect(copied).not.toMatch(/^#/m);
+    expect(copied).not.toContain("**");
+    expect(copied).toContain("hxxps://short[.]example/abc");
     expect(status(container).textContent).toBe(COPY_SUCCESS);
     expect(status(container).getAttribute("aria-live")).toBe("polite");
   });
@@ -175,7 +190,7 @@ describe("EvidenceReportExport", () => {
     await clickAsync(buttons(container).copy);
     expect(writeText).toHaveBeenCalledTimes(2);
     expect(writeText.mock.calls[0][0]).toBe(writeText.mock.calls[1][0]);
-    expect(writeText.mock.calls[1][0]).toBe(buildEvidenceReport(RESULT));
+    expect(writeText.mock.calls[1][0]).toBe(buildPlainTextReport(RESULT));
     expect(status(container).textContent).toBe(COPY_SUCCESS);
   });
 
@@ -186,15 +201,18 @@ describe("EvidenceReportExport", () => {
     expect(status(container).textContent).toBe(COPY_FAILURE);
   });
 
-  it("download requests a Markdown Blob of the report with the UTC timestamped filename", async () => {
+  it("Download PDF saves a real PDF file (application/pdf) with the UTC timestamped name", async () => {
     const { container } = mount(<EvidenceReportExport result={RESULT} />);
-    await clickAsync(buttons(container).download);
+    await clickAsync(buttons(container).pdf);
     expect(createObjectURL).toHaveBeenCalledTimes(1);
     const blob = createObjectURL.mock.calls[0][0] as Blob;
-    expect(blob.type).toBe("text/markdown;charset=utf-8");
-    expect(await readBlob(blob)).toBe(buildEvidenceReport(RESULT));
-    const filename = reportFilename(RESULT.timestamp);
-    expect(filename).toBe("scryvorn-report-20261114-064812.md"); // +02:00 -> UTC
+    expect(blob.type).toBe("application/pdf");
+    const pdf = await readBlobBytes(blob);
+    expect(pdf.startsWith("%PDF-1.4")).toBe(true);
+    expect(pdf.trimEnd().endsWith("%%EOF")).toBe(true);
+    expect(pdf).toContain("(Scored deterministic findings) Tj");
+    const filename = reportFilenameWithExtension(RESULT.timestamp, "pdf");
+    expect(filename).toBe("scryvorn-report-20261114-064812.pdf"); // +02:00 -> UTC
     expect(anchorClicks).toEqual([{ href: "blob:mock-1", download: filename }]);
     expect(document.querySelector("a[download]")).toBeNull(); // temporary anchor removed
     expect(status(container).textContent).toBe(downloadStarted(filename));
@@ -202,17 +220,39 @@ describe("EvidenceReportExport", () => {
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:mock-1");
   });
 
+  it("Download .txt saves the same plain-text report as text/plain", async () => {
+    const { container } = mount(<EvidenceReportExport result={RESULT} />);
+    await clickAsync(buttons(container).txt);
+    const blob = createObjectURL.mock.calls[0][0] as Blob;
+    expect(blob.type).toBe("text/plain;charset=utf-8");
+    expect(await readBlob(blob)).toBe(buildPlainTextReport(RESULT));
+    const filename = reportFilenameWithExtension(RESULT.timestamp, "txt");
+    expect(anchorClicks).toEqual([{ href: "blob:mock-1", download: filename }]);
+    expect(status(container).textContent).toBe(downloadStarted(filename));
+  });
+
+  it("says so (never silently) when the PDF cannot show some characters", async () => {
+    const withCjk = { ...RESULT, deterministicFindings: [{ ...RESULT.deterministicFindings[0], evidence: "你好 destination hidden" }] };
+    const { container } = mount(<EvidenceReportExport result={withCjk} />);
+    await clickAsync(buttons(container).pdf);
+    const pdf = await readBlobBytes(createObjectURL.mock.calls[0][0] as Blob);
+    expect(pdf).toContain("could not be shown in the PDF");
+    expect(status(container).textContent).toBe(
+      `${downloadStarted(reportFilenameWithExtension(RESULT.timestamp, "pdf"))} ${PDF_SUBSTITUTION_STATUS}`,
+    );
+  });
+
   it("download failure shows an error and a retry requests the same report", async () => {
     createObjectURL.mockImplementationOnce(() => {
       throw new Error("blocked");
     });
     const { container } = mount(<EvidenceReportExport result={RESULT} />);
-    await clickAsync(buttons(container).download);
+    await clickAsync(buttons(container).txt);
     expect(status(container).textContent).toBe(DOWNLOAD_FAILURE);
     expect(anchorClicks).toHaveLength(0);
-    expect(buttons(container).download.disabled).toBe(false);
-    await clickAsync(buttons(container).download);
-    expect(await readBlob(createObjectURL.mock.calls[1][0] as Blob)).toBe(buildEvidenceReport(RESULT));
+    expect(buttons(container).txt.disabled).toBe(false);
+    await clickAsync(buttons(container).txt);
+    expect(await readBlob(createObjectURL.mock.calls[1][0] as Blob)).toBe(buildPlainTextReport(RESULT));
     expect(anchorClicks).toHaveLength(1);
   });
 
@@ -221,7 +261,7 @@ describe("EvidenceReportExport", () => {
     setClipboard({ writeText });
     const { container } = mount(<EvidenceReportExport result={INCOMPLETE} />);
     await clickAsync(buttons(container).copy);
-    expect(writeText).toHaveBeenCalledWith(buildEvidenceReport(INCOMPLETE));
+    expect(writeText).toHaveBeenCalledWith(buildPlainTextReport(INCOMPLETE));
     expect(String(writeText.mock.calls[0][0])).toContain("Assessment incomplete");
   });
 
@@ -236,9 +276,7 @@ describe("EvidenceReportExport", () => {
 
   it("an invalid timestamp disables export and shows a build error", () => {
     const { container } = mount(<EvidenceReportExport result={{ ...RESULT, timestamp: "not a date" }} />);
-    const b = buttons(container);
-    expect(b.copy.disabled).toBe(true);
-    expect(b.download.disabled).toBe(true);
+    for (const btn of Object.values(buttons(container))) expect(btn.disabled).toBe(true);
     expect(status(container).textContent).toBe(BUILD_FAILURE);
   });
 });

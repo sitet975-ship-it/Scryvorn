@@ -37,23 +37,27 @@ export function Ghost({ id, width, className = "" }: { id: string; width: number
 }
 
 /**
- * Ghosts drifting behind the cathedral arches (backdrop layer, behind all
- * content). On wide screens they keep to the upper-right region beside the
- * headline and drift only a short distance (--drift), so they never sit
- * behind body text; on small screens the mobile strip shows its own ghost.
+ * Ghosts drifting in the cathedral on both sides of the screen (backdrop
+ * layer, behind all content). On wide screens two keep to the left edge and
+ * two to the right edge, in the gutters beside the content column, and each
+ * drifts only a short distance (--dx, --dy) on its own slow cycle. On small
+ * screens the mobile strip shows one ghost per side instead.
  */
+export const GHOSTS = [
+  { id: "ghost-l1", cls: "scry-ghost-a", pos: "left-[1.5%] top-[16%]", width: 70, opacity: "opacity-75", drift: "[--dx:1.2vw] [--dy:-2vh]" },
+  { id: "ghost-l2", cls: "scry-ghost-c", pos: "left-[3%] top-[52%]", width: 52, opacity: "opacity-55", drift: "[--dx:0.8vw] [--dy:3vh]" },
+  { id: "ghost-r1", cls: "scry-ghost-b", pos: "right-[1.5%] top-[8%]", width: 80, opacity: "opacity-80", drift: "[--dx:-1.2vw] [--dy:2vh]" },
+  { id: "ghost-r2", cls: "scry-ghost-d", pos: "right-[3%] top-[44%]", width: 56, opacity: "opacity-60", drift: "[--dx:-0.8vw] [--dy:-3vh]" },
+] as const;
+
 export function Ghosts({ className = "" }: { className?: string }) {
   return (
     <div data-decorative="ghosts" aria-hidden="true" className={`pointer-events-none absolute inset-0 hidden lg:block ${className}`}>
-      <div className="scry-ghost-a absolute left-[68%] top-[4%] opacity-80 [--drift:10vw]">
-        <Ghost id="ghost-a" width={84} />
-      </div>
-      <div className="scry-ghost-b absolute left-[86%] top-[10%] opacity-65 [--drift:2vw]">
-        <Ghost id="ghost-b" width={62} />
-      </div>
-      <div className="scry-ghost-c absolute left-[74%] top-[24%] opacity-55 [--drift:6vw]">
-        <Ghost id="ghost-c" width={54} />
-      </div>
+      {GHOSTS.map((g) => (
+        <div key={g.id} data-ghost-side={g.id.startsWith("ghost-l") ? "left" : "right"} className={`${g.cls} absolute ${g.pos} ${g.opacity} ${g.drift}`}>
+          <Ghost id={g.id} width={g.width} />
+        </div>
+      ))}
     </div>
   );
 }

@@ -135,14 +135,14 @@ describe("primary controls are native and focusable (jsdom-level only)", () => {
     expect(revealed.every(Boolean)).toBe(true);
     check(revealed);
 
-    // Preserved view: copy, download, back, new investigation.
+    // Preserved view: copy, download PDF, download .txt, back, new investigation.
     click(byText(VIEW_REPORT_LABEL));
     const preserved = [
       ...([...container.querySelectorAll('[data-section="report-export"] button')] as HTMLButtonElement[]),
       byText(BACK_TO_ASSESSMENT_LABEL),
       byText(NEW_INVESTIGATION_LABEL),
     ];
-    expect(preserved).toHaveLength(4);
+    expect(preserved).toHaveLength(5);
     check(preserved);
   });
 });

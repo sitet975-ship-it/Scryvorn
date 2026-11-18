@@ -8,8 +8,10 @@ import { DECORATIVE_SVG, r2, seeded } from "./seeded";
  * eight jointed legs (femur, tibia, tarsus) with banded knees and hundreds
  * of individual hairs, pedipalps, chelicerae, and glowing amber eyes.
  *
- * Motion (disabled under reduced motion): alternating leg gait and a slow
- * crawl along a dedicated lower lane that never overlaps content.
+ * Motion (disabled under reduced motion): alternating leg gait and a slow,
+ * continuous walk through reserved space that never overlaps content.
+ * Drawn as two layers: TarantulaLegs (animated, no filters) beneath
+ * Tarantula (the static, filtered body).
  */
 type Pt = { x: number; y: number };
 const rand = seeded(1879);
@@ -114,12 +116,45 @@ const PALP_HAIR =
 
 const seg = (a: Pt, b: Pt) => `M${a.x} ${a.y}L${b.x} ${b.y}`;
 
+export const TARANTULA_VIEWBOX = "0 -32 240 214";
+
+/**
+ * The tarantula's eight jointed, hairy legs with the alternating gait. A
+ * separate SVG layer (beneath the body) with no filters, so animating the gait
+ * repaints only the legs; the detailed body stays a cached, static layer.
+ */
+export function TarantulaLegs({ className = "" }: { className?: string }) {
+  return (
+    <svg {...DECORATIVE_SVG} data-decorative="tarantula-legs" viewBox={TARANTULA_VIEWBOX} className={className}>
+      {LEGS.map((leg) => (
+        <g
+          key={`${leg.side}-${leg.i}`}
+          className={leg.group === "a" ? "scry-gait-a" : "scry-gait-b"}
+          style={{ transformBox: "view-box", transformOrigin: `${leg.hip.x}px ${leg.hip.y}px` }}
+        >
+          <path d={leg.hair} stroke="#B68A5C" strokeWidth="0.6" strokeLinecap="round" opacity="0.95" />
+          <path d={seg(leg.hip, leg.knee)} stroke="#1E120B" strokeWidth="7" strokeLinecap="round" />
+          <path d={seg(leg.hip, leg.knee)} stroke="#7A5234" strokeWidth="2.4" strokeLinecap="round" opacity="0.9" />
+          <path d={seg(leg.knee, leg.foot)} stroke="#1E120B" strokeWidth="5.4" strokeLinecap="round" />
+          <path d={seg(leg.knee, leg.foot)} stroke="#7A5234" strokeWidth="1.8" strokeLinecap="round" opacity="0.9" />
+          <path d={seg(leg.foot, leg.tip)} stroke="#1E120B" strokeWidth="3.6" strokeLinecap="round" />
+          {/* Pale knee and tibia bands. */}
+          <circle cx={leg.knee.x} cy={leg.knee.y} r="4.2" fill="#A47C50" opacity="0.95" />
+          <circle cx={leg.knee.x} cy={leg.knee.y} r="2.2" fill="#D2AC78" opacity="0.8" />
+          <circle cx={leg.foot.x} cy={leg.foot.y} r="3" fill="#7A5A3A" opacity="0.85" />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
+/** The tarantula's body (abdomen, carapace, pedipalps, eyes): static, detailed artwork. */
 export function Tarantula({ className = "h-auto w-[220px]" }: { className?: string }) {
   return (
     <svg
       {...DECORATIVE_SVG}
       data-decorative="tarantula"
-      viewBox="0 -32 240 214"
+      viewBox={TARANTULA_VIEWBOX}
       className={className}
     >
       <defs>
@@ -150,33 +185,7 @@ export function Tarantula({ className = "h-auto w-[220px]" }: { className?: stri
             <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
-        <filter id="tar-shadow" x="-20%" y="-40%" width="140%" height="180%">
-          <feGaussianBlur stdDeviation="5" />
-        </filter>
       </defs>
-
-      {/* Ground shadow. */}
-      <ellipse cx="118" cy="84" rx="92" ry="34" fill="#000" opacity="0.55" filter="url(#tar-shadow)" />
-
-      {/* Legs: femur, tibia, tarsus with banded joints and hair. */}
-      {LEGS.map((leg) => (
-        <g
-          key={`${leg.side}-${leg.i}`}
-          className={leg.group === "a" ? "scry-gait-a" : "scry-gait-b"}
-          style={{ transformBox: "view-box", transformOrigin: `${leg.hip.x}px ${leg.hip.y}px` }}
-        >
-          <path d={leg.hair} stroke="#B68A5C" strokeWidth="0.6" strokeLinecap="round" opacity="0.95" />
-          <path d={seg(leg.hip, leg.knee)} stroke="#1E120B" strokeWidth="7" strokeLinecap="round" />
-          <path d={seg(leg.hip, leg.knee)} stroke="#7A5234" strokeWidth="2.4" strokeLinecap="round" opacity="0.9" />
-          <path d={seg(leg.knee, leg.foot)} stroke="#1E120B" strokeWidth="5.4" strokeLinecap="round" />
-          <path d={seg(leg.knee, leg.foot)} stroke="#7A5234" strokeWidth="1.8" strokeLinecap="round" opacity="0.9" />
-          <path d={seg(leg.foot, leg.tip)} stroke="#1E120B" strokeWidth="3.6" strokeLinecap="round" />
-          {/* Pale knee and tibia bands. */}
-          <circle cx={leg.knee.x} cy={leg.knee.y} r="4.2" fill="#A47C50" opacity="0.95" />
-          <circle cx={leg.knee.x} cy={leg.knee.y} r="2.2" fill="#D2AC78" opacity="0.8" />
-          <circle cx={leg.foot.x} cy={leg.foot.y} r="3" fill="#7A5A3A" opacity="0.85" />
-        </g>
-      ))}
 
       {/* Pedipalps and chelicerae. */}
       <g>
@@ -214,7 +223,7 @@ export function Tarantula({ className = "h-auto w-[220px]" }: { className?: stri
 
       {/* Ocular tubercle and glowing amber eyes. */}
       <ellipse cx="154" cy="75" rx="5" ry="4" fill="#0E0805" />
-      <g filter="url(#tar-glow)" className="scry-glow-pulse">
+      <g filter="url(#tar-glow)">
         <circle cx="155.6" cy="72.9" r="2.4" fill="url(#tar-eye)" />
         <circle cx="155.6" cy="77.1" r="2.4" fill="url(#tar-eye)" />
       </g>
@@ -266,21 +275,39 @@ export function TarantulaLane({ children }: { children?: React.ReactNode }) {
  * lane edges, which covers the ~20 px sideways growth of the rotated box. So
  * the spider stays inside the lane at every point of the walk. On lg the box
  * is a 112 px square walking the perimeter (scry-perimeter).
+ *
+ * Smooth, continuous motion: the walk animates only `transform` (positions
+ * use container query units of the zone, which is a size container), so the
+ * browser runs it off the main thread and it never waits for page work or
+ * mouse input. The legs and the body are separate layers: only the legs
+ * repaint for the gait, and the furred body is drawn once. Browsers without
+ * container units fall back to the still resting pose (scry-tarantula-rest).
  */
 export function TarantulaPerimeter() {
   return (
-    <div data-decorative="tarantula-zone" aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+    <div data-decorative="tarantula-zone" aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden [container-type:size]">
       <div
         data-tarantula-anchor=""
-        className="scry-tarantula-walk absolute left-[20%] top-[calc(100%-var(--tar-box)-var(--tar-lift))] flex h-[var(--tar-box)] w-[var(--tar-w)] items-center justify-center [--tar-box:103px] [--tar-lift:28px] [--tar-w:116px] sm:[--tar-box:114px] sm:[--tar-lift:31px] sm:[--tar-w:128px] lg:[--tar-box:112px] lg:[--tar-lift:6px] lg:[--tar-w:112px]"
+        className="scry-tarantula-walk scry-tarantula-rest absolute left-0 top-0 flex h-[var(--tar-box)] w-[var(--tar-w)] items-center justify-center will-change-transform [--tar-box:103px] [--tar-lift:28px] [--tar-w:116px] sm:[--tar-box:114px] sm:[--tar-lift:31px] sm:[--tar-w:128px] lg:[--tar-box:112px] lg:[--tar-lift:6px] lg:[--tar-w:112px]"
       >
+        {/* Ground shadow and amber halo: soft gradients, no blur filters. */}
+        <div
+          aria-hidden="true"
+          className="absolute inset-[6%] rounded-[50%]"
+          style={{ background: "radial-gradient(ellipse at 50% 58%, rgba(0,0,0,0.55), rgba(0,0,0,0.28) 45%, rgba(0,0,0,0) 72%)" }}
+        />
         <div
           aria-hidden="true"
           className="absolute inset-[12%] rounded-[50%]"
-          style={{ background: "radial-gradient(ellipse at 50% 55%, rgba(232,137,43,0.34), rgba(232,137,43,0) 70%)", filter: "blur(6px)" }}
+          style={{ background: "radial-gradient(ellipse at 50% 55%, rgba(232,137,43,0.3), rgba(232,137,43,0.12) 40%, rgba(232,137,43,0) 70%)" }}
         />
-        {/* aspect-[240/214] matches the viewBox, so the image box is exactly the drawing's size. */}
-        <Tarantula className="relative aspect-[240/214] h-auto w-full" />
+        {/*
+          Legs beneath the body, both centered in the same box (SVG "meet"
+          scaling keeps them aligned). aspect-[240/214] matches the viewBox, so
+          the body's image box is exactly the drawing's size.
+        */}
+        <TarantulaLegs className="absolute inset-0 h-full w-full will-change-transform" />
+        <Tarantula className="relative aspect-[240/214] h-auto w-full will-change-transform" />
       </div>
     </div>
   );

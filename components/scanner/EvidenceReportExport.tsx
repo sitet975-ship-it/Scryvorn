@@ -2,14 +2,22 @@
 
 import { useMemo, useState } from "react";
 import type { ScanResult } from "@/lib/types";
-import { buildEvidenceReport, reportFilename } from "@/lib/report/evidenceReport";
+import { REPORT_PDF_TITLE, buildReportPdf } from "@/lib/report/pdf";
+import { buildReportDocument, renderPlainText, reportFilenameWithExtension } from "@/lib/report/reportDocument";
 
 /**
- * Copy / download the Evidence_Report built by buildEvidenceReport.
+ * Copy / download the Evidence Report.
  *
- * - Both buttons are disabled until a scan result exists (result === null).
- * - Copy uses navigator.clipboard.writeText. Download creates a Markdown Blob,
- *   an object URL, and a temporary <a download> with reportFilename (UTC).
+ * - Copy writes the plain-text report (no Markdown symbols) with
+ *   navigator.clipboard.writeText.
+ * - Download PDF builds a real PDF file (lib/report/pdf, no dependencies).
+ *   If some characters cannot be represented in the PDF, the PDF says so and
+ *   the status message points to the exact .txt report. No format is ever
+ *   substituted silently.
+ * - Download .txt saves the same plain-text report.
+ * - Files are named scryvorn-report-YYYYMMDD-HHmmss.<pdf|txt> (UTC) and are
+ *   created in the browser from a Blob; nothing is uploaded or stored.
+ * - All buttons are disabled until a scan result exists (result === null).
  * - On failure an error notice is shown; the report is derived from the same
  *   result, so it is unchanged and the user can retry.
  * - Status messages are announced through an always-present aria-live region
@@ -19,7 +27,8 @@ import { buildEvidenceReport, reportFilename } from "@/lib/report/evidenceReport
  * They cannot verify a real system clipboard write or a real browser download.
  */
 export const COPY_LABEL = "Copy Evidence Report";
-export const DOWNLOAD_LABEL = "Download Report (.md)";
+export const DOWNLOAD_PDF_LABEL = "Download Report (PDF)";
+export const DOWNLOAD_TXT_LABEL = "Download Report (.txt)";
 export const COPY_SUCCESS = "Evidence report copied to clipboard.";
 export const COPY_FAILURE =
   "Could not copy the evidence report. The report is unchanged; please try again.";
@@ -27,13 +36,18 @@ export const DOWNLOAD_FAILURE =
   "Could not download the evidence report. The report is unchanged; please try again.";
 export const BUILD_FAILURE = "The evidence report could not be generated for this scan.";
 export const downloadStarted = (filename: string) => `Download started: ${filename}`;
+export const PDF_SUBSTITUTION_STATUS =
+  'Some characters could not be shown in the PDF and appear as "?". The .txt report contains the exact text.';
 
 type Status = { kind: "success" | "error"; text: string; report: string } | null;
+type Built = { text: string; lines: ReturnType<typeof buildReportDocument>; timestamp: string };
 
-function build(result: ScanResult | null): { report: string; filename: string } | null | "error" {
+function build(result: ScanResult | null): Built | null | "error" {
   if (!result) return null;
   try {
-    return { report: buildEvidenceReport(result), filename: reportFilename(result.timestamp) };
+    const lines = buildReportDocument(result);
+    reportFilenameWithExtension(result.timestamp, "txt"); // validates the timestamp
+    return { text: renderPlainText(lines), lines, timestamp: result.timestamp };
   } catch {
     return "error";
   }
@@ -42,15 +56,33 @@ function build(result: ScanResult | null): { report: string; filename: string } 
 const BUTTON_CLASS =
   "inline-flex min-h-[48px] items-center justify-center rounded-sm border border-scry-amber/60 bg-scry-bg/70 px-5 py-2 font-semibold text-scry-ivory transition hover:border-scry-amber hover:bg-scry-crimson/30 disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-scry-amber";
 
+/** Saves a Blob through a temporary <a download>, so the browser downloads it as a file. */
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    a.rel = "noopener";
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } finally {
+    // Revoke after the click has been handled.
+    setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+}
+
 export function EvidenceReportExport({ result }: { result: ScanResult | null }) {
   const built = useMemo(() => build(result), [result]);
   const [status, setStatus] = useState<Status>(null);
   const ready = built !== null && built !== "error";
-  const report = ready ? built.report : null;
+  const report = ready ? built.text : null;
 
   async function copy() {
     if (!ready) return;
-    const text = built.report;
+    const text = built.text;
     try {
       if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
       await navigator.clipboard.writeText(text);
@@ -60,30 +92,27 @@ export function EvidenceReportExport({ result }: { result: ScanResult | null }) 
     }
   }
 
-  function download() {
+  function downloadPdf() {
     if (!ready) return;
-    const { report: text, filename } = built;
-    let url: string | null = null;
     try {
-      const blob = new Blob([text], { type: "text/markdown;charset=utf-8" });
-      url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.rel = "noopener";
-      a.style.display = "none";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setStatus({ kind: "success", text: downloadStarted(filename), report: text });
+      const filename = reportFilenameWithExtension(built.timestamp, "pdf");
+      const pdf = buildReportPdf(built.lines, { title: REPORT_PDF_TITLE });
+      saveBlob(new Blob([pdf.bytes], { type: "application/pdf" }), filename);
+      const text = downloadStarted(filename) + (pdf.substituted ? ` ${PDF_SUBSTITUTION_STATUS}` : "");
+      setStatus({ kind: "success", text, report: built.text });
     } catch {
-      setStatus({ kind: "error", text: DOWNLOAD_FAILURE, report: text });
-    } finally {
-      if (url) {
-        const toRevoke = url;
-        // Revoke after the click has been handled.
-        setTimeout(() => URL.revokeObjectURL(toRevoke), 0);
-      }
+      setStatus({ kind: "error", text: DOWNLOAD_FAILURE, report: built.text });
+    }
+  }
+
+  function downloadTxt() {
+    if (!ready) return;
+    try {
+      const filename = reportFilenameWithExtension(built.timestamp, "txt");
+      saveBlob(new Blob([built.text], { type: "text/plain;charset=utf-8" }), filename);
+      setStatus({ kind: "success", text: downloadStarted(filename), report: built.text });
+    } catch {
+      setStatus({ kind: "error", text: DOWNLOAD_FAILURE, report: built.text });
     }
   }
 
@@ -97,8 +126,11 @@ export function EvidenceReportExport({ result }: { result: ScanResult | null }) 
         <button type="button" onClick={copy} disabled={!ready} className={BUTTON_CLASS}>
           {COPY_LABEL}
         </button>
-        <button type="button" onClick={download} disabled={!ready} className={BUTTON_CLASS}>
-          {DOWNLOAD_LABEL}
+        <button type="button" onClick={downloadPdf} disabled={!ready} className={BUTTON_CLASS}>
+          {DOWNLOAD_PDF_LABEL}
+        </button>
+        <button type="button" onClick={downloadTxt} disabled={!ready} className={BUTTON_CLASS}>
+          {DOWNLOAD_TXT_LABEL}
         </button>
       </div>
       <p

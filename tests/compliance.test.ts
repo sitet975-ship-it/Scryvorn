@@ -127,11 +127,25 @@ describe("LICENSE", () => {
 describe("out-of-scope features", () => {
   const CODE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 
+  /**
+   * Evidence Report PDF export (writing a PDF, not scanning one) is in scope
+   * (.kiro/steering/product.md and tech.md). These are the only allowed
+   * "pdf" code files.
+   */
+  const REPORT_PDF_EXPORT = ["lib/report/pdf.ts", "lib/report/pdf.test.ts"];
+
   it("has no contract-PDF, bank-statement, or subscription-drain modules", () => {
     const offenders = repoFiles()
       .filter((f) => CODE.test(f))
+      .filter((f) => !REPORT_PDF_EXPORT.includes(f))
       .filter((f) => /contract|lease|pdf|bank[-_]?statement|statement[-_]?pars|subscription|drain/i.test(f));
     expect(offenders).toEqual([]);
+  });
+
+  it("the PDF module only writes the Evidence Report (it never parses or reads PDFs)", () => {
+    const src = read("lib/report/pdf.ts");
+    expect(src).toContain("export function buildReportPdf");
+    expect(src).not.toMatch(/FileReader|arrayBuffer\(|\.text\(\)|fetch\(|getDocument|parsePdf/);
   });
 
   it("depends on no PDF or statement-parsing packages", () => {

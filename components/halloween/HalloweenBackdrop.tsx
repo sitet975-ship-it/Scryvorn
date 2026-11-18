@@ -1,8 +1,8 @@
 import { Bat, Bats } from "./Bats";
 import { Candle, CandleCluster, Fog } from "./CandleFog";
-import { Cobweb } from "./Cobweb";
 import { DescendingSpider } from "./DescendingSpider";
 import { Ghost, Ghosts } from "./Ghosts";
+import { CornerTracery, GargoyleGroup } from "./GothicDetails";
 import { JackOLantern } from "./JackOLantern";
 import { DECORATIVE_SVG } from "./seeded";
 
@@ -12,23 +12,7 @@ const PILLAR_X = [70, 250, 1190, 1370];
 const arch = (x0: number, x1: number, spring: number, apex: number) =>
   `M${x0} 900 V${spring} Q${x0} ${apex + (spring - apex) * 0.25} ${(x0 + x1) / 2} ${apex} Q${x1} ${apex + (spring - apex) * 0.25} ${x1} ${spring} V900`;
 
-const VAMPIRE_PATH =
-  "M0 -96 C-7 -96 -11 -90 -11 -83 C-11 -77 -8 -73 -6 -71 L-24 -64 C-40 -40 -52 -6 -60 40 L-26 30 L-14 40 L0 34 L14 40 L26 30 L60 40 C52 -6 40 -40 24 -64 L6 -71 C8 -73 11 -77 11 -83 C11 -90 7 -96 0 -96Z M-11 -86 L-16 -100 L-6 -92Z M11 -86 L16 -100 L6 -92Z";
-
-/** Caped vampire silhouette, backlit with a faint ember rim and red eyes. */
-function Vampire({ transform, opacity }: { transform: string; opacity: number }) {
-  return (
-    <g opacity={opacity} transform={transform}>
-      <ellipse cx="0" cy="-30" rx="78" ry="92" fill="url(#cat-vampire-glow)" />
-      <path d={VAMPIRE_PATH} fill="#040305" stroke="#8A3A1C" strokeWidth="1.6" strokeOpacity="0.8" />
-      <path d="M-24 -64 L0 -52 L24 -64" fill="none" stroke="#B91C1C" strokeWidth="2" opacity="0.9" />
-      <circle cx="-3.5" cy="-84" r="1.8" fill="#B91C1C" />
-      <circle cx="3.5" cy="-84" r="1.8" fill="#B91C1C" />
-    </g>
-  );
-}
-
-/** Cathedral architecture: vaults, rose window, lancets, pillars, distant vampires. */
+/** Cathedral architecture: vaults, rose window, lancets, pillars, gargoyles. */
 function Cathedral() {
   return (
     <svg
@@ -48,11 +32,6 @@ function Cathedral() {
           <stop offset="0%" stopColor="#E8892B" stopOpacity="0.65" />
           <stop offset="55%" stopColor="#9B2626" stopOpacity="0.4" />
           <stop offset="100%" stopColor="#3A0F0F" stopOpacity="0.12" />
-        </radialGradient>
-        <radialGradient id="cat-vampire-glow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stopColor="#E8892B" stopOpacity="0.32" />
-          <stop offset="60%" stopColor="#9B2626" stopOpacity="0.16" />
-          <stop offset="100%" stopColor="#9B2626" stopOpacity="0" />
         </radialGradient>
         <radialGradient id="cat-amber-floor" cx="50%" cy="100%" r="70%">
           <stop offset="0%" stopColor="#E8892B" stopOpacity="0.34" />
@@ -105,12 +84,9 @@ function Cathedral() {
         </g>
       ))}
 
-      {/* A vampire silhouetted against the right lancet window (beside the headline on wide screens). */}
-      <Vampire transform="translate(1010 352) scale(0.7)" opacity={0.95} />
-
-      {/* Distant nave arch with a second, restrained vampire silhouette. */}
+      {/* Distant nave arch with its own small lancet tracery. */}
       <path d={arch(640, 800, 520, 360)} fill="url(#cat-distance)" />
-      <Vampire transform="translate(720 640)" opacity={0.9} />
+      <path d={`${arch(680, 760, 560, 440)} M720 440 V900`} fill="none" stroke="#1E0F0F" strokeWidth="4" opacity="0.8" />
 
       {/* Nave arcade arches. */}
       <path d={`${arch(330, 640, 470, 250)} ${arch(800, 1110, 470, 250)}`} fill="none" stroke="#1E1315" strokeWidth="14" />
@@ -129,6 +105,14 @@ function Cathedral() {
         </g>
       ))}
 
+      {/*
+        Stone gargoyles perched on the outer pillar capitals, facing the nave.
+        The outer pillars sit in the side gutters, so the gargoyles never sit
+        behind the headline (on narrower screens they are cropped away).
+      */}
+      <GargoyleGroup transform="translate(19 214) scale(0.86)" />
+      <GargoyleGroup transform="translate(1421 214) scale(-0.86 0.86)" />
+
       {/* Warm candle and lantern light pooling on the floor. */}
       <rect y="560" width="1440" height="340" fill="url(#cat-amber-floor)" />
       <path d="M0 830 L1440 830 M0 865 L1440 865 M360 900 L560 760 M1080 900 L880 760 M720 900 V760" stroke="#2A1A14" strokeOpacity="0.6" strokeWidth="1.5" />
@@ -139,9 +123,10 @@ function Cathedral() {
 /**
  * Mobile-only Halloween strip (hidden from the sm breakpoint up), rendered as
  * its own block directly under the navigation. Because it occupies its own
- * space in the page flow, its jack-o'-lantern, ghost, bats, cobwebs, candle,
- * and fog never overlap controls or text. overflow-hidden prevents
- * horizontal scrolling.
+ * space in the page flow, its gothic corner tracery, ghosts (one per side),
+ * independently flying bats, candle, and fog never overlap controls or text.
+ * The lantern lives in the bottom lane, so the two areas do not repeat each
+ * other. overflow-hidden prevents horizontal scrolling.
  */
 export function MobileAtmosphere() {
   return (
@@ -151,17 +136,26 @@ export function MobileAtmosphere() {
       className="pointer-events-none relative h-20 overflow-hidden border-b border-scry-border/60 sm:hidden"
       style={{ background: "radial-gradient(ellipse at 82% 100%, rgba(232,137,43,0.3), transparent 55%), radial-gradient(ellipse at 14% 100%, rgba(232,137,43,0.18), transparent 50%), radial-gradient(ellipse at 50% 30%, rgba(155,38,38,0.18), transparent 60%)" }}
     >
-      <Cobweb size={64} opacity={0.36} className="absolute left-0 top-0" />
-      <Cobweb size={64} flip opacity={0.36} className="absolute right-0 top-0" />
-      <Ghost id="mob-ghost" width={34} className="absolute left-[58%] top-2 opacity-80" />
-      <Bat width={40} className="absolute left-[28%] top-2" />
-      <Bat width={26} opacity={0.9} className="absolute left-[44%] top-9" />
-      <Bat width={18} opacity={0.8} className="absolute left-[74%] top-3" />
-      <div className="absolute bottom-0 left-[12%]">
-        <Candle id="mob-cand" height={54} wax={0.8} />
+      <CornerTracery size={64} opacity={0.7} className="absolute left-0 top-0" />
+      <CornerTracery size={64} flip opacity={0.7} className="absolute right-0 top-0" />
+      {/* Ghosts on both sides; bats each on their own small flight path. */}
+      <div className="scry-ghost-m1 absolute left-[20%] top-2 opacity-80">
+        <Ghost id="mob-ghost-l" width={30} />
       </div>
-      <div className="absolute bottom-0 right-[14%]">
-        <JackOLantern id="mob-jol" width={58} />
+      <div className="scry-ghost-m2 absolute left-[76%] top-3 opacity-70">
+        <Ghost id="mob-ghost-r" width={26} />
+      </div>
+      <div className="scry-bat-m1 absolute left-[38%] top-2">
+        <Bat width={34} flap="1.15s" />
+      </div>
+      <div className="scry-bat-m2 absolute left-[54%] top-9">
+        <Bat width={22} opacity={0.9} flap="0.95s" />
+      </div>
+      <div className="scry-bat-m3 absolute left-[64%] top-1">
+        <Bat width={16} opacity={0.8} flap="1.35s" />
+      </div>
+      <div className="absolute bottom-0 left-[6%]">
+        <Candle id="mob-cand" height={50} wax={0.8} />
       </div>
       <Fog className="h-full" />
     </div>
@@ -185,23 +179,20 @@ export function HalloweenBackdrop() {
       <Ghosts />
       <Bats className="top-[4%] h-[34%]" />
 
-      {/* Large geometric cobwebs in the upper corners. */}
-      <Cobweb size={240} className="absolute left-0 top-14 hidden sm:block" opacity={0.36} />
-      <Cobweb size={240} flip className="absolute right-0 top-14 hidden sm:block" opacity={0.36} />
-      <Cobweb size={120} flip className="absolute right-0 top-14 sm:hidden" opacity={0.22} />
+      {/* Gothic corner tracery in the upper corners (stone vault spandrels). */}
+      <CornerTracery size={220} className="absolute left-0 top-14 hidden sm:block" opacity={0.75} />
+      <CornerTracery size={220} flip className="absolute right-0 top-14 hidden sm:block" opacity={0.75} />
 
-      {/* A second spider descending from an arch (outside the content column on desktop). */}
+      {/* A spider descending from an arch (outside the content column on desktop). */}
       <DescendingSpider className="right-[6%] top-0 hidden lg:block" />
       <DescendingSpider className="left-[4%] top-0 hidden sm:block lg:hidden" />
 
-      {/* Jack-o'-lanterns and candles at the pillar bases. */}
-      <div className="absolute bottom-6 left-[1%] hidden items-end gap-2 lg:flex">
-        <JackOLantern id="jol-bl" width={140} />
-        <CandleCluster id="cand-bl" scale={0.95} />
+      {/* One lantern and one candle group, at opposite pillar bases. */}
+      <div className="absolute bottom-6 left-[1%] hidden lg:block">
+        <JackOLantern id="jol-bl" width={132} />
       </div>
-      <div className="absolute bottom-6 right-[1%] hidden items-end gap-2 lg:flex">
-        <CandleCluster id="cand-br" scale={0.95} />
-        <JackOLantern id="jol-br" width={120} face="fangs" />
+      <div className="absolute bottom-6 right-[2%] hidden lg:block">
+        <CandleCluster id="cand-br" scale={0.9} />
       </div>
 
       <Fog className="h-[42%]" />

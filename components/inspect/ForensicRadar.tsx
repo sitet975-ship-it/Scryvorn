@@ -26,10 +26,6 @@ export function ForensicRadar({ active, label }: { active: boolean; label: strin
             <stop offset="60%" stopColor="#9B2626" stopOpacity="0.08" />
             <stop offset="100%" stopColor="#070709" stopOpacity="0" />
           </radialGradient>
-          <linearGradient id="radar-sweep" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0%" stopColor="#E8892B" stopOpacity="0" />
-            <stop offset="100%" stopColor="#E8892B" stopOpacity="0.45" />
-          </linearGradient>
         </defs>
         <circle cx="100" cy="100" r="88" fill="url(#radar-core)" />
         <circle cx="100" cy="100" r="86" fill="none" stroke="#9B2626" strokeOpacity="0.6" strokeWidth="1" />
@@ -39,12 +35,29 @@ export function ForensicRadar({ active, label }: { active: boolean; label: strin
         <path d={TICKS} stroke="#E8892B" strokeOpacity="0.45" strokeWidth="0.7" />
         <path d="M100 6 V194 M6 100 H194" stroke="#9B2626" strokeOpacity="0.4" strokeWidth="0.6" />
         <path d="M70 70 h-8 v8 M130 70 h8 v8 M70 130 h-8 v-8 M130 130 h8 v-8" stroke="#E8892B" strokeOpacity="0.7" strokeWidth="1" fill="none" />
-        <g className={active ? "scry-sweep-fast" : "scry-sweep"} style={{ transformBox: "view-box", transformOrigin: "100px 100px" }}>
-          <path d="M100 100 L186 100 A86 86 0 0 0 160.8 39.2 Z" fill="url(#radar-sweep)" />
-          <path d="M100 100 L186 100" stroke="#E8892B" strokeWidth="1" strokeOpacity="0.8" />
-        </g>
         <circle cx="100" cy="100" r="2.4" fill="#E8892B" />
       </svg>
+      {/*
+        The sweep is its own layer, rotated with a CSS transform on an HTML
+        wrapper (browsers run CSS animations off the main thread only on HTML
+        elements), so it never repaints the radar every frame.
+      */}
+      <div aria-hidden="true" data-decorative="radar-sweep" className={`pointer-events-none absolute inset-0 ${active ? "scry-sweep-fast" : "scry-sweep"}`}>
+      <svg
+        {...DECORATIVE_SVG}
+        viewBox="0 0 200 200"
+        className="h-full w-full"
+      >
+        <defs>
+          <linearGradient id="radar-sweep" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stopColor="#E8892B" stopOpacity="0" />
+            <stop offset="100%" stopColor="#E8892B" stopOpacity="0.45" />
+          </linearGradient>
+        </defs>
+        <path d="M100 100 L186 100 A86 86 0 0 0 160.8 39.2 Z" fill="url(#radar-sweep)" />
+        <path d="M100 100 L186 100" stroke="#E8892B" strokeWidth="1" strokeOpacity="0.8" />
+      </svg>
+      </div>
       {active ? <LabEnergy /> : null}
       <p
         aria-hidden="true"

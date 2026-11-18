@@ -12,12 +12,14 @@ import { act } from "react";
 import type { AiFinding } from "@/lib/ai/types";
 import type { DeterministicFinding } from "@/lib/checks/types";
 import { ADVISORY_DISCLAIMER, FALLBACK_VERIFICATION_STEPS } from "@/lib/constants";
-import { INCOMPLETE_ASSESSMENT_NOTICE, STEP_SOURCE_LABELS, buildEvidenceReport } from "@/lib/report/evidenceReport";
+import { INCOMPLETE_ASSESSMENT_NOTICE, REPORT_SECTIONS, STEP_SOURCE_LABELS } from "@/lib/report/evidenceReport";
+import { buildPlainTextReport, buildReportDocument, spansText } from "@/lib/report/reportDocument";
+import { SAVED_INVESTIGATIONS_KEY, loadSaved, saveInvestigation } from "@/lib/storage/savedInvestigations";
 import { SAMPLE_TRAPS } from "@/lib/samples/sampleTraps";
 import type { CompleteScanResult, IncompleteScanResult } from "@/lib/types";
 import { click, render, submit, typeValue, type Rendered } from "@/test/dom";
 import { AI_PARTIAL_EVIDENCE_NOTICE } from "./AiInterpretation";
-import { COPY_LABEL, DOWNLOAD_LABEL } from "./EvidenceReportExport";
+import { COPY_LABEL, DOWNLOAD_PDF_LABEL, DOWNLOAD_TXT_LABEL } from "./EvidenceReportExport";
 import { LOADING_TEXT } from "./LoadingState";
 import {
   BACK_TO_ASSESSMENT_LABEL,
@@ -25,9 +27,14 @@ import {
   GENERIC_SCAN_ERROR,
   HEADLINES,
   NEW_INVESTIGATION_LABEL,
+  SAVED_STATUS,
+  SAVE_DISCLOSURE,
+  STEPS,
   ScannerCard,
   VIEW_REPORT_LABEL,
+  savedViewNotice,
 } from "./ScannerCard";
+import { CLEAR_ALL_LABEL, CLEAR_CANCEL_LABEL, CLEAR_CONFIRM_LABEL, SAVED_EMPTY, SAVED_NOTICE, SAVED_UNAVAILABLE, formatUtc } from "./SavedInvestigations";
 import { INPUT_REQUIRED_MESSAGE, INPUT_TOO_LONG_MESSAGE } from "./ScannerInput";
 import { PARTIAL_FINDINGS_NOTICE } from "./VerifiedChecks";
 
@@ -211,7 +218,7 @@ describe("ScannerCard state machine", () => {
     expect(document.activeElement).toBe(u.title); // focus moves to the new view
     expect(u.status.textContent).toBe("");
     const order = [...container.querySelectorAll("[data-section]")].map((e) => e.getAttribute("data-section"));
-    expect(order).toEqual(["verdict", "verified-checks", "ai-interpretation", "recommended-steps"]);
+    expect(order).toEqual(["verdict", "verified-checks", "ai-interpretation", "recommended-steps", "saved-investigations"]);
     expect(container.querySelector('[data-verdict="complete"]')).not.toBeNull();
     // Tier and score come from the real result, not fixed copy.
     expect(container.querySelector("[data-tier]")!.textContent).toBe(COMPLETE.severityTier);
@@ -225,17 +232,24 @@ describe("ScannerCard state machine", () => {
     const r = ui(container);
     expect(r.view).toBe("preserved");
     expect(r.title.textContent).toBe(HEADLINES.preserved.title);
-    expect(container.querySelector("[data-report-text]")!.textContent).toBe(buildEvidenceReport(COMPLETE));
-    expect(r.exportButtons.map((b) => b.textContent)).toEqual([COPY_LABEL, DOWNLOAD_LABEL]);
+    const report = container.querySelector("[data-report-text]")!;
+    // The same wording as the exports, shown as a formatted document: real headings, no Markdown symbols.
+    const doc = buildReportDocument(COMPLETE);
+    expect(report.textContent).toBe(doc.map((l) => ("spans" in l ? spansText(l.spans) : "")).join(""));
+    expect([...report.querySelectorAll("h3")].map((h) => h.textContent)).toEqual([...REPORT_SECTIONS]);
+    expect(report.textContent).not.toMatch(/#|\*\*/);
+    expect(report.querySelectorAll("ul li").length).toBeGreaterThan(3);
+    expect(r.exportButtons.map((b) => b.textContent)).toEqual([COPY_LABEL, DOWNLOAD_PDF_LABEL, DOWNLOAD_TXT_LABEL]);
     expect(r.exportButtons.every((b) => !b.disabled)).toBe(true);
 
-    // Back to the assessment, then a new investigation keeps the input.
+    // Back to the assessment, then a new investigation begins a fresh, empty examination.
     press(container, BACK_TO_ASSESSMENT_LABEL);
     expect(ui(container).view).toBe("revealed");
     press(container, NEW_INVESTIGATION_LABEL);
     const n = ui(container);
     expect(n.view).toBe("awaiting");
-    expect(n.textarea.value).toBe("check this");
+    expect(n.textarea.value).toBe("");
+    expect(n.results).toBeNull();
     expect(document.activeElement).toBe(n.textarea);
   });
 
@@ -266,19 +280,19 @@ describe("ScannerCard state machine", () => {
     expect(container.querySelector("[data-score], [data-tier]")).toBeNull();
     press(container, VIEW_REPORT_LABEL);
     const r = ui(container);
-    expect(r.exportButtons).toHaveLength(2);
+    expect(r.exportButtons).toHaveLength(3);
     expect(r.exportButtons.every((b) => !b.disabled)).toBe(true);
     // The report explains the incomplete assessment.
     expect(container.querySelector("[data-report-text]")!.textContent).toContain(INCOMPLETE_ASSESSMENT_NOTICE);
   });
 
-  it("a new scan immediately clears the previous result and keeps the input", async () => {
+  it("a new scan immediately clears the previous result and keeps the new input", async () => {
     const f = controlledFetch();
     const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} />);
     await scanWith(container, f.calls, "first", 200, COMPLETE);
     expect(ui(container).results).not.toBeNull();
     press(container, NEW_INVESTIGATION_LABEL);
-    expect(ui(container).textarea.value).toBe("first");
+    expect(ui(container).textarea.value).toBe("");
     typeValue(ui(container).textarea, "second");
     submit(ui(container).form);
     const u = ui(container);
@@ -374,33 +388,168 @@ describe("ScannerCard state machine", () => {
   });
 });
 
-describe("no persistence", () => {
+/** In-memory Storage that records every call. */
+class MemoryStorage implements Storage {
+  map = new Map<string, string>();
+  calls: string[] = [];
+  get length() {
+    return this.map.size;
+  }
+  clear() {
+    this.calls.push("clear");
+    this.map.clear();
+  }
+  getItem(k: string) {
+    this.calls.push(`get:${k}`);
+    return this.map.get(k) ?? null;
+  }
+  key(i: number) {
+    return [...this.map.keys()][i] ?? null;
+  }
+  removeItem(k: string) {
+    this.calls.push(`remove:${k}`);
+    this.map.delete(k);
+  }
+  setItem(k: string, v: string) {
+    this.calls.push(`set:${k}`);
+    this.map.set(k, v);
+  }
+}
+
+describe("step indicator and examining view", () => {
+  it("shows Submit, Examine, Results, Report and marks the current step", async () => {
+    const f = controlledFetch();
+    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} storage={null} />);
+    const current = () => container.querySelector('[data-steps] [aria-current="step"]')!.textContent;
+    expect([...container.querySelectorAll("[data-steps] li")].map((li) => li.textContent!.replace(/^\d+|›$/g, ""))).toEqual([...STEPS]);
+    expect(current()).toContain("Submit");
+    typeValue(ui(container).textarea, "check this");
+    submit(ui(container).form);
+    expect(current()).toContain("Examine");
+    // The examining view lists the three real pipeline stages (descriptions, not fake progress).
+    expect(container.querySelectorAll("[data-examining-stages] li")).toHaveLength(3);
+    await act(async () => f.calls[0].resolve(200, COMPLETE));
+    await flush();
+    expect(current()).toContain("Results");
+    press(container, VIEW_REPORT_LABEL);
+    expect(current()).toContain("Report");
+  });
+});
+
+describe("Saved Investigations (disclosed, this browser only)", () => {
   afterEach(() => {
-    // Remove the instance-level cookie spy so the prototype accessor applies again.
     delete (document as unknown as { cookie?: string }).cookie;
   });
 
-  it("a full scan writes nothing to Web Storage or cookies", async () => {
-    const setItem = vi.spyOn(Storage.prototype, "setItem");
-    const getItem = vi.spyOn(Storage.prototype, "getItem");
+  it("discloses saving before any scan, and shows the empty state", async () => {
+    const storage = new MemoryStorage();
+    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: controlledFetch().fetchImpl }} storage={storage} />);
+    await flush();
+    expect(container.querySelector("[data-save-disclosure]")!.textContent).toBe(SAVE_DISCLOSURE);
+    expect(container.querySelector("[data-saved-notice]")!.textContent).toBe(SAVED_NOTICE);
+    expect(container.textContent).toContain(SAVED_EMPTY);
+    expect(storage.calls.filter((c) => c.startsWith("set:"))).toEqual([]);
+  });
+
+  it("saves a completed investigation automatically, and only that, under one key", async () => {
+    const storage = new MemoryStorage();
     const cookieSet = vi.fn();
     Object.defineProperty(document, "cookie", { configurable: true, get: () => "", set: cookieSet });
     const idbOpen = typeof indexedDB !== "undefined" ? vi.spyOn(indexedDB, "open") : null;
+    const session = vi.spyOn(Storage.prototype, "setItem"); // the real (jsdom) Web Storage must stay untouched
     const f = controlledFetch();
-    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} />);
+    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} storage={storage} />);
+    // A failed scan saves nothing.
+    await scanWith(container, f.calls, "private text https://x.example", 500, { error: "internal_error" });
+    expect(storage.calls.filter((c) => c.startsWith("set:"))).toEqual([]);
     await scanWith(container, f.calls, "private text https://x.example", 200, COMPLETE);
-    expect(setItem).not.toHaveBeenCalled();
-    expect(getItem).not.toHaveBeenCalled();
+    expect(storage.calls.filter((c) => c.startsWith("set:"))).toEqual([`set:${SAVED_INVESTIGATIONS_KEY}`]);
+    expect([...storage.map.keys()]).toEqual([SAVED_INVESTIGATIONS_KEY]);
+    const [entry] = loadSaved(storage);
+    expect(entry.input).toBe("private text https://x.example");
+    expect(entry.result).toEqual(COMPLETE);
+    expect(entry.report).toBe(buildPlainTextReport(COMPLETE));
+    expect(container.querySelector("[data-save-status]")!.textContent).toBe(SAVED_STATUS);
+    expect(container.querySelectorAll("[data-saved-list] li")).toHaveLength(1);
     expect(cookieSet).not.toHaveBeenCalled();
     if (idbOpen) expect(idbOpen).not.toHaveBeenCalled();
+    expect(session).not.toHaveBeenCalled();
   });
 
-  it("scan-flow sources reference no persistence API", () => {
+  it("reopens a saved investigation (after a reload) in the same views, then deletes it", async () => {
+    const storage = new MemoryStorage();
+    saveInvestigation("saved earlier https://evil.example/x", INCOMPLETE, storage, new Date("2026-11-14T09:00:00Z"));
+    saveInvestigation("saved later", COMPLETE, storage, new Date("2026-11-14T09:05:00Z"));
+    const f = controlledFetch();
+    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} storage={storage} />);
+    await flush();
+    const items = [...container.querySelectorAll("[data-saved-list] li")];
+    // Excerpts are defanged plain text, never links.
+    expect(items.map((li) => li.querySelector("p:nth-child(3)")!.textContent)).toEqual(["saved later", "saved earlier hxxps://evil[.]example/x"]);
+    expect(container.querySelector("[data-saved-list] a")).toBeNull();
+    expect(items[1].textContent).toContain("Assessment incomplete");
+    expect(items[0].textContent).toContain(`Risk score ${COMPLETE.riskScore}`);
+
+    click(items[0].querySelector("button")!); // Open
+    let u = ui(container);
+    expect(u.view).toBe("revealed");
+    expect(u.textarea).toBeNull(); // the results view replaces the input form
+    expect(container.querySelector("[data-score]")!.textContent).toBe(String(COMPLETE.riskScore));
+    expect(container.querySelector("[data-saved-view]")!.textContent).toBe(savedViewNotice(formatUtc(COMPLETE.timestamp)));
+    expect(f.mock).not.toHaveBeenCalled(); // reopening does not rescan
+    press(container, VIEW_REPORT_LABEL);
+    expect(ui(container).view).toBe("preserved");
+    expect(container.querySelector("[data-report-text]")!.textContent).toContain(REPORT_SECTIONS[0]);
+
+    // Start fresh, then the saved input is not carried over.
+    press(container, NEW_INVESTIGATION_LABEL);
+    u = ui(container);
+    expect(u.textarea.value).toBe("");
+    expect(container.querySelector("[data-saved-view]")).toBeNull();
+
+    // Delete one.
+    const del = [...container.querySelectorAll("[data-saved-list] li")][1].querySelectorAll("button")[1];
+    click(del);
+    expect(loadSaved(storage).map((e) => e.input)).toEqual(["saved later"]);
+    expect(container.querySelectorAll("[data-saved-list] li")).toHaveLength(1);
+  });
+
+  it("Clear all asks for confirmation; Cancel keeps everything, confirming removes everything", async () => {
+    const storage = new MemoryStorage();
+    saveInvestigation("one", COMPLETE, storage);
+    saveInvestigation("two", COMPLETE, storage);
+    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: controlledFetch().fetchImpl }} storage={storage} />);
+    await flush();
+    press(container, CLEAR_ALL_LABEL);
+    press(container, CLEAR_CANCEL_LABEL);
+    expect(loadSaved(storage)).toHaveLength(2);
+    press(container, CLEAR_ALL_LABEL);
+    press(container, CLEAR_CONFIRM_LABEL);
+    expect(loadSaved(storage)).toEqual([]);
+    expect(storage.map.has(SAVED_INVESTIGATIONS_KEY)).toBe(false);
+    expect(container.textContent).toContain(SAVED_EMPTY);
+  });
+
+  it("still works without storage, and says investigations are not being saved", async () => {
+    const f = controlledFetch();
+    const { container } = mount(<ScannerCard requestOptions={{ fetchImpl: f.fetchImpl }} storage={null} />);
+    await flush();
+    expect(container.textContent).toContain(SAVED_UNAVAILABLE);
+    await scanWith(container, f.calls, "check this", 200, COMPLETE);
+    expect(ui(container).view).toBe("revealed");
+    expect(container.querySelector("[data-save-status]")!.textContent).toBe("");
+  });
+
+  it("only the Saved Investigations module references a persistence API", () => {
     const files = [
       "components/scanner/ScannerCard.tsx",
+      "components/scanner/SavedInvestigations.tsx",
       "components/scanner/ResultsPanel.tsx",
       "components/scanner/EvidenceReportView.tsx",
+      "components/scanner/EvidenceReportExport.tsx",
       "lib/scan/scanClient.ts",
+      "lib/report/reportDocument.ts",
+      "lib/report/pdf.ts",
       "app/page.tsx",
       "app/inspect/page.tsx",
       "app/layout.tsx",
@@ -413,7 +562,8 @@ describe("no persistence", () => {
       const src = readFileSync(resolve(process.cwd(), file), "utf8");
       expect(src, file).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie|caches\.open|showSaveFilePicker/);
     }
+    const storageModule = readFileSync(resolve(process.cwd(), "lib/storage/savedInvestigations.ts"), "utf8");
+    expect(storageModule).toContain("localStorage");
+    expect(storageModule).not.toMatch(/sessionStorage|indexedDB|document\.cookie/);
   });
 });
-
-

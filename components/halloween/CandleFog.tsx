@@ -19,7 +19,6 @@ export function Candle({
   const body = `${id}-body`;
   const flame = `${id}-flame`;
   const halo = `${id}-halo`;
-  const blur = `${id}-blur`;
   const top = 40 + (1 - wax) * 50;
   return (
     <svg
@@ -29,7 +28,6 @@ export function Candle({
       height={height}
       viewBox="0 0 44 140"
       className={className}
-      style={{ ...DECORATIVE_SVG.style, filter: "drop-shadow(0 0 10px rgba(232,137,43,0.45))" }}
     >
       <defs>
         <linearGradient id={body} x1="0" x2="1">
@@ -48,9 +46,6 @@ export function Candle({
           <stop offset="0%" stopColor="#FFC24A" stopOpacity="0.85" />
           <stop offset="100%" stopColor="#E8892B" stopOpacity="0" />
         </radialGradient>
-        <filter id={blur} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="1.4" />
-        </filter>
       </defs>
       {/* Pooled wax on the stone. */}
       <ellipse cx="22" cy="134" rx="20" ry="5" fill="#D9CBAE" opacity="0.85" />
@@ -68,8 +63,8 @@ export function Candle({
       <path d={`M22 ${top} q1 -4 0 -7`} stroke="#1A1614" strokeWidth="1.2" fill="none" />
       {/* Flame and halo. */}
       <g className="scry-flicker" style={{ transformOrigin: `22px ${top - 6}px`, transformBox: "view-box" }}>
-        <ellipse cx="22" cy={top - 14} rx="18" ry="22" fill={`url(#${halo})`} />
-        <path d={`M22 ${top - 30} C30 ${top - 18} 28 ${top - 6} 22 ${top - 5} C16 ${top - 6} 14 ${top - 18} 22 ${top - 30}Z`} fill={`url(#${flame})`} filter={`url(#${blur})`} />
+        <ellipse cx="22" cy={top - 14} rx="21" ry="26" fill={`url(#${halo})`} />
+        <path d={`M22 ${top - 30} C30 ${top - 18} 28 ${top - 6} 22 ${top - 5} C16 ${top - 6} 14 ${top - 18} 22 ${top - 30}Z`} fill={`url(#${flame})`} />
         <path d={`M22 ${top - 22} C25 ${top - 15} 24 ${top - 9} 22 ${top - 8} C20 ${top - 9} 19 ${top - 15} 22 ${top - 22}Z`} fill="#FFFBEA" opacity="0.85" />
       </g>
     </svg>
@@ -87,22 +82,26 @@ export function CandleCluster({ id, scale = 1, className = "" }: { id: string; s
   );
 }
 
-/** Low drifting fog: wide, soft, slow-moving bands. */
+/**
+ * Low drifting fog: wide, soft, slow-moving bands. The softness comes from
+ * multi-stop radial gradients rather than CSS blur filters, so moving the
+ * bands does not force the browser to re-blur large areas every frame.
+ */
 export function Fog({ className = "" }: { className?: string }) {
   return (
     <div data-decorative="fog" aria-hidden="true" className={`pointer-events-none absolute inset-x-0 bottom-0 overflow-hidden ${className}`}>
       <div
         className="scry-fog-a absolute -left-[10%] bottom-[-30%] h-[120%] w-[120%] rounded-[50%]"
-        style={{ background: "radial-gradient(ellipse at 30% 60%, rgba(234,226,214,0.18), transparent 60%)", filter: "blur(18px)" }}
+        style={{ background: "radial-gradient(ellipse at 30% 60%, rgba(234,226,214,0.15), rgba(234,226,214,0.07) 32%, rgba(234,226,214,0.02) 52%, transparent 66%)" }}
       />
       <div
         className="scry-fog-b absolute -left-[10%] bottom-[-40%] h-[120%] w-[120%] rounded-[50%]"
-        style={{ background: "radial-gradient(ellipse at 70% 55%, rgba(234,226,214,0.15), transparent 62%)", filter: "blur(22px)" }}
+        style={{ background: "radial-gradient(ellipse at 70% 55%, rgba(234,226,214,0.13), rgba(234,226,214,0.06) 34%, rgba(234,226,214,0.015) 54%, transparent 68%)" }}
       />
       {/* Low ember-lit band: candle and lantern light caught in the fog. */}
       <div
         className="scry-fog-a absolute -left-[10%] bottom-[-55%] h-[90%] w-[120%] rounded-[50%]"
-        style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(232,137,43,0.10), transparent 65%)", filter: "blur(26px)" }}
+        style={{ background: "radial-gradient(ellipse at 50% 50%, rgba(232,137,43,0.09), rgba(232,137,43,0.04) 36%, transparent 70%)" }}
       />
     </div>
   );

@@ -36,13 +36,42 @@ body {
 
 /*
  * Ambient laboratory glow (static). This is what reduced-motion users see;
- * with motion allowed the same glow breathes slowly (scry-ambient keyframes).
+ * with motion allowed the glow breathes slowly. The breathing animates only
+ * opacity (of the ring itself, and of a glow layer behind the panel), never
+ * box-shadow, so it does not repaint the panel every frame.
  */
 .scry-ambient-ring {
-  box-shadow: 0 0 30px -8px rgba(74, 222, 128, 0.28), 0 0 46px -12px rgba(232, 137, 43, 0.3);
+  box-shadow: 0 0 40px -6px rgba(74, 222, 128, 0.42), 0 0 60px -10px rgba(232, 137, 43, 0.38);
+  opacity: 0.75;
 }
 .scry-ambient-panel {
+  position: relative;
   box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.12), 0 0 26px -14px rgba(74, 222, 128, 0.35), 0 24px 48px -24px rgba(0, 0, 0, 0.8);
+}
+.scry-ambient-panel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.14), 0 0 34px -12px rgba(74, 222, 128, 0.42);
+  opacity: 0.5;
+}
+
+/*
+ * Resting poses (also the still scene under reduced motion). Bats are spread
+ * across the upper cathedral; the tarantula rests in the bottom lane, 20%
+ * from the left. Positions use the tarantula zone's container query units.
+ */
+.scry-bat-1 { transform: translate(14vw, 0); }
+.scry-bat-2 { transform: translate(72vw, 0); }
+.scry-bat-3 { transform: translate(40vw, 0); }
+.scry-bat-4 { transform: translate(86vw, 0); }
+.scry-bat-5 { transform: translate(6vw, 0); }
+.scry-bat-6 { transform: translate(58vw, 0); }
+.scry-tarantula-rest { transform: translate(20cqw, calc(100cqh - var(--tar-box) - var(--tar-lift))); }
+@supports not (width: 1cqw) {
+  .scry-tarantula-rest { left: 20%; top: calc(100% - var(--tar-box) - var(--tar-lift)); transform: none; }
 }
 
 /*
@@ -58,27 +87,47 @@ body {
   .scry-glow-pulse { animation: scry-glow 6s ease-in-out infinite alternate; }
   .scry-fog-a { animation: scry-fog 70s linear infinite alternate; }
   .scry-fog-b { animation: scry-fog 95s linear infinite alternate-reverse; }
+  /* Ghosts: each on its own slow cycle and drift (--dx, --dy), on both sides. */
   .scry-ghost-a { animation: scry-ghost 46s ease-in-out infinite; }
   .scry-ghost-b { animation: scry-ghost 61s ease-in-out infinite; animation-delay: -20s; }
   .scry-ghost-c { animation: scry-ghost 53s ease-in-out infinite; animation-delay: -34s; }
-  .scry-bats { animation: scry-bats 38s linear infinite; }
-  .scry-bats-late { animation: scry-bats 52s linear infinite; animation-delay: -26s; }
-  .scry-wing { animation: scry-wing 0.9s ease-in-out infinite alternate; transform-origin: 50% 50%; transform-box: fill-box; }
-  .scry-descend { animation: scry-descend 16s ease-in-out infinite; }
+  .scry-ghost-d { animation: scry-ghost 57s ease-in-out infinite; animation-delay: -9s; }
+  .scry-ghost-m1 { animation: scry-ghost-small 14s ease-in-out infinite alternate; }
+  .scry-ghost-m2 { animation: scry-ghost-small 17s ease-in-out infinite alternate-reverse; animation-delay: -6s; }
+  .scry-ghost-a, .scry-ghost-b, .scry-ghost-c, .scry-ghost-d, .scry-ghost-m1, .scry-ghost-m2 { will-change: transform, opacity; }
+
+  /* Bats: independent directions, paths, speeds, and start offsets. */
+  .scry-bat-1 { animation: scry-bat-wave-ltr 34s linear infinite; animation-delay: -6s; }
+  .scry-bat-2 { animation: scry-bat-dip-rtl 47s linear infinite; animation-delay: -21s; }
+  .scry-bat-3 { animation: scry-bat-climb-ltr 41s linear infinite; animation-delay: -33s; }
+  .scry-bat-4 { animation: scry-bat-rise-rtl 56s linear infinite; animation-delay: -12s; }
+  .scry-bat-5 { animation: scry-bat-circle 19s ease-in-out infinite; animation-delay: -4s; }
+  .scry-bat-6 { animation: scry-bat-glide-ltr 29s linear infinite; animation-delay: -17s; }
+  .scry-bat-m1 { animation: scry-bat-hover-a 7s ease-in-out infinite alternate; }
+  .scry-bat-m2 { animation: scry-bat-hover-b 9s ease-in-out infinite alternate; animation-delay: -3s; }
+  .scry-bat-m3 { animation: scry-bat-hover-c 11s ease-in-out infinite alternate-reverse; }
+  [class*="scry-bat-"] { will-change: transform; }
+  /* The wing layer is an HTML wrapper, so the wingbeat can run as a compositor transform. */
+  .scry-wing { animation: scry-wing var(--flap, 0.9s) ease-in-out infinite alternate; transform-origin: 50% 64%; will-change: transform; }
+  .scry-descend { animation: scry-descend 16s ease-in-out infinite; will-change: transform; }
+  .scry-fog-a, .scry-fog-b { will-change: transform; }
   .scry-gait-a { animation: scry-gait 1.6s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 0% 50%; }
   .scry-gait-b { animation: scry-gait 1.6s ease-in-out infinite alternate-reverse; transform-box: fill-box; transform-origin: 0% 50%; }
-  .scry-sweep { animation: scry-spin 9s linear infinite; transform-origin: 50% 50%; }
-  .scry-sweep-fast { animation: scry-spin 4s linear infinite; transform-origin: 50% 50%; }
+  .scry-sweep { animation: scry-spin 9s linear infinite; transform-origin: 50% 50%; will-change: transform; }
+  .scry-sweep-fast { animation: scry-spin 4s linear infinite; transform-origin: 50% 50%; will-change: transform; }
   .scry-arc { animation: scry-arc 3.2s ease-in-out infinite; }
   .scry-arc-late { animation: scry-arc 3.2s ease-in-out infinite; animation-delay: -1.6s; }
-  .scry-ambient-ring { animation: scry-ambient-ring 7s ease-in-out infinite alternate; }
-  .scry-ambient-panel { animation: scry-ambient-panel 9s ease-in-out infinite alternate; }
+  .scry-ambient-ring { animation: scry-ambient-ring 7s ease-in-out infinite alternate; will-change: opacity; }
+  .scry-ambient-panel::after { animation: scry-ambient-panel 9s ease-in-out infinite alternate; will-change: opacity; }
 
   /* Tarantula: walks the bottom lane on small screens ... */
   .scry-tarantula-walk { animation: scry-lane-walk 70s linear infinite; }
   /* ... and the outer perimeter (left gutter, bottom lane, right gutter) on wide screens. */
   @media (min-width: 1024px) {
     .scry-tarantula-walk { animation: scry-perimeter 160s linear infinite; }
+  }
+  @supports not (width: 1cqw) {
+    .scry-tarantula-walk { animation: none; }
   }
 }
 
@@ -95,17 +144,63 @@ body {
   from { transform: translateX(-6%); }
   to { transform: translateX(6%); }
 }
-/* Short drift so ghosts stay in their own region of the backdrop. */
+/* Short drift (and back) so each ghost stays on its own side of the backdrop. */
 @keyframes scry-ghost {
   0% { transform: translate(0, 0); opacity: 0; }
   15% { opacity: 1; }
-  50% { transform: translate(var(--drift, 10vw), -2vh); }
+  50% { transform: translate(var(--dx, 1vw), var(--dy, -2vh)); }
   85% { opacity: 1; }
-  100% { transform: translate(calc(var(--drift, 10vw) * 2), 0); opacity: 0; }
+  100% { transform: translate(0, 0); opacity: 0; }
 }
-@keyframes scry-bats {
-  from { transform: translateX(-20vw); }
-  to { transform: translateX(120vw); }
+@keyframes scry-ghost-small {
+  from { transform: translate(0, 0); opacity: 0.55; }
+  to { transform: translate(6px, -3px); opacity: 1; }
+}
+/* Bat flights (vw/vh: the bats band spans the viewport width). */
+@keyframes scry-bat-wave-ltr {
+  0% { transform: translate(-12vw, 0); }
+  25% { transform: translate(18vw, -4vh); }
+  50% { transform: translate(48vw, 3vh); }
+  75% { transform: translate(80vw, -3vh); }
+  100% { transform: translate(112vw, 1vh); }
+}
+@keyframes scry-bat-dip-rtl {
+  0% { transform: translate(112vw, 0); }
+  35% { transform: translate(72vw, 7vh); }
+  65% { transform: translate(38vw, -2vh); }
+  100% { transform: translate(-12vw, 5vh); }
+}
+@keyframes scry-bat-climb-ltr {
+  0% { transform: translate(-12vw, 9vh); }
+  50% { transform: translate(50vw, 2vh); }
+  100% { transform: translate(112vw, -6vh); }
+}
+@keyframes scry-bat-rise-rtl {
+  0% { transform: translate(112vw, 2vh); }
+  45% { transform: translate(62vw, -7vh); }
+  100% { transform: translate(-12vw, -14vh); }
+}
+@keyframes scry-bat-circle {
+  0%, 100% { transform: translate(6vw, 0); }
+  25% { transform: translate(11vw, -4vh); }
+  50% { transform: translate(16vw, 0); }
+  75% { transform: translate(11vw, 4vh); }
+}
+@keyframes scry-bat-glide-ltr {
+  0% { transform: translate(-12vw, 11vh); }
+  100% { transform: translate(112vw, -9vh); }
+}
+@keyframes scry-bat-hover-a {
+  from { transform: translate(0, 0); }
+  to { transform: translate(18px, -5px); }
+}
+@keyframes scry-bat-hover-b {
+  from { transform: translate(0, 0); }
+  to { transform: translate(-14px, 4px); }
+}
+@keyframes scry-bat-hover-c {
+  from { transform: translate(0, 2px); }
+  to { transform: translate(10px, -6px); }
 }
 @keyframes scry-wing {
   from { transform: scaleY(1); }
@@ -120,12 +215,12 @@ body {
  * (20% from the left), walks right, turns, walks left, turns back.
  */
 @keyframes scry-lane-walk {
-  0%, 4% { left: 20%; transform: rotate(0deg); }
-  40% { left: calc(96% - var(--tar-w) - 20px); transform: rotate(0deg); }
-  44% { left: calc(96% - var(--tar-w) - 20px); transform: rotate(180deg); }
-  84% { left: calc(4% + 20px); transform: rotate(180deg); }
-  88% { left: calc(4% + 20px); transform: rotate(360deg); }
-  100% { left: 20%; transform: rotate(360deg); }
+  0%, 4% { transform: translate(20cqw, calc(100cqh - var(--tar-box) - var(--tar-lift))) rotate(0deg); }
+  40% { transform: translate(calc(96cqw - var(--tar-w) - 20px), calc(100cqh - var(--tar-box) - var(--tar-lift))) rotate(0deg); }
+  44% { transform: translate(calc(96cqw - var(--tar-w) - 20px), calc(100cqh - var(--tar-box) - var(--tar-lift))) rotate(180deg); }
+  84% { transform: translate(calc(4cqw + 20px), calc(100cqh - var(--tar-box) - var(--tar-lift))) rotate(180deg); }
+  88% { transform: translate(calc(4cqw + 20px), calc(100cqh - var(--tar-box) - var(--tar-lift))) rotate(360deg); }
+  100% { transform: translate(20cqw, calc(100cqh - var(--tar-box) - var(--tar-lift))) rotate(360deg); }
 }
 /*
  * Perimeter walk (wide screens), positions relative to the creature zone
@@ -136,19 +231,19 @@ body {
  * down, bottom lane left, left gutter up, turn.
  */
 @keyframes scry-perimeter {
-  0% { left: -16px; top: 2%; transform: rotate(90deg); }
-  16% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(90deg); }
-  18% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(0deg); }
-  31% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(0deg); }
-  33% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(-90deg); }
-  49% { left: calc(100% - var(--tar-w) + 16px); top: 2%; transform: rotate(-90deg); }
-  51% { left: calc(100% - var(--tar-w) + 16px); top: 2%; transform: rotate(90deg); }
-  67% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(90deg); }
-  69% { left: calc(100% - var(--tar-w) + 16px); top: calc(100% - var(--tar-box) - 8px); transform: rotate(180deg); }
-  82% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(180deg); }
-  84% { left: -16px; top: calc(100% - var(--tar-box) - 8px); transform: rotate(270deg); }
-  98% { left: -16px; top: 2%; transform: rotate(270deg); }
-  100% { left: -16px; top: 2%; transform: rotate(450deg); }
+  0% { transform: translate(-16px, 2cqh) rotate(90deg); }
+  16% { transform: translate(-16px, calc(100cqh - var(--tar-box) - 8px)) rotate(90deg); }
+  18% { transform: translate(-16px, calc(100cqh - var(--tar-box) - 8px)) rotate(0deg); }
+  31% { transform: translate(calc(100cqw - var(--tar-w) + 16px), calc(100cqh - var(--tar-box) - 8px)) rotate(0deg); }
+  33% { transform: translate(calc(100cqw - var(--tar-w) + 16px), calc(100cqh - var(--tar-box) - 8px)) rotate(-90deg); }
+  49% { transform: translate(calc(100cqw - var(--tar-w) + 16px), 2cqh) rotate(-90deg); }
+  51% { transform: translate(calc(100cqw - var(--tar-w) + 16px), 2cqh) rotate(90deg); }
+  67% { transform: translate(calc(100cqw - var(--tar-w) + 16px), calc(100cqh - var(--tar-box) - 8px)) rotate(90deg); }
+  69% { transform: translate(calc(100cqw - var(--tar-w) + 16px), calc(100cqh - var(--tar-box) - 8px)) rotate(180deg); }
+  82% { transform: translate(-16px, calc(100cqh - var(--tar-box) - 8px)) rotate(180deg); }
+  84% { transform: translate(-16px, calc(100cqh - var(--tar-box) - 8px)) rotate(270deg); }
+  98% { transform: translate(-16px, 2cqh) rotate(270deg); }
+  100% { transform: translate(-16px, 2cqh) rotate(450deg); }
 }
 @keyframes scry-gait {
   from { transform: rotate(-4deg); }
@@ -162,10 +257,10 @@ body {
   50% { opacity: 0.9; stroke-dashoffset: -60; }
 }
 @keyframes scry-ambient-ring {
-  from { box-shadow: 0 0 26px -10px rgba(74, 222, 128, 0.22), 0 0 40px -14px rgba(232, 137, 43, 0.22); }
-  to { box-shadow: 0 0 40px -6px rgba(74, 222, 128, 0.42), 0 0 60px -10px rgba(232, 137, 43, 0.38); }
+  from { opacity: 0.5; }
+  to { opacity: 1; }
 }
 @keyframes scry-ambient-panel {
-  from { box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.10), 0 0 22px -16px rgba(74, 222, 128, 0.25), 0 24px 48px -24px rgba(0, 0, 0, 0.8); }
-  to { box-shadow: 0 0 0 1px rgba(232, 137, 43, 0.24), 0 0 34px -12px rgba(74, 222, 128, 0.45), 0 24px 48px -24px rgba(0, 0, 0, 0.8); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }

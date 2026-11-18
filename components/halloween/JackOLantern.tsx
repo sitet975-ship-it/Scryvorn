@@ -19,7 +19,7 @@ export function JackOLantern({
   const shell = `${id}-shell`;
   const rib = `${id}-rib`;
   const glow = `${id}-glow`;
-  const blur = `${id}-blur`;
+  const inner = `${id}-inner`;
   const spill = `${id}-spill`;
   const mouth =
     face === "grin"
@@ -54,9 +54,11 @@ export function JackOLantern({
           <stop offset="0%" stopColor="#E8892B" stopOpacity="0.75" />
           <stop offset="100%" stopColor="#E8892B" stopOpacity="0" />
         </radialGradient>
-        <filter id={blur} x="-30%" y="-30%" width="160%" height="160%">
-          <feGaussianBlur stdDeviation="2.4" />
-        </filter>
+        <radialGradient id={inner} cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stopColor="#FFC24A" stopOpacity="0.55" />
+          <stop offset="60%" stopColor="#E8892B" stopOpacity="0.18" />
+          <stop offset="100%" stopColor="#E8892B" stopOpacity="0" />
+        </radialGradient>
       </defs>
       {/* Light spilling onto the stone floor. */}
       <ellipse className="scry-glow-pulse" cx="61" cy="104" rx="60" ry="9" fill={`url(#${spill})`} />
@@ -73,12 +75,10 @@ export function JackOLantern({
       {/* Stem. */}
       <path d="M57 22 Q55 10 62 4 Q66 2 67 6 Q62 12 65 22 Z" fill="#3B3A1E" stroke="#1C1B0D" strokeWidth="1" />
       <path d="M66 8 Q76 2 80 10" fill="none" stroke="#3B3A1E" strokeWidth="1.6" strokeLinecap="round" />
+      {/* Inner glow behind the carved face (a soft gradient; no blur filter). */}
+      <ellipse cx="61" cy="64" rx="36" ry="30" fill={`url(#${inner})`} />
       {/* Carved face, lit from inside. */}
       <g className="scry-flicker">
-        <g filter={`url(#${blur})`} opacity="0.8">
-          <path d="M36 44 L48 56 L30 58Z M86 44 L74 56 L92 58Z M61 58 L66 66 L56 66Z" fill="#FFB347" />
-          <path d={mouth} fill="#FFB347" />
-        </g>
         <path d="M36 44 L48 56 L30 58Z M86 44 L74 56 L92 58Z M61 58 L66 66 L56 66Z" fill={`url(#${glow})`} />
         <path d={mouth} fill={`url(#${glow})`} fillRule="evenodd" />
       </g>
