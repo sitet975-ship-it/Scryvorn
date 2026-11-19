@@ -44,8 +44,25 @@ export const SCORING_WEIGHTS = {
     lookalike_high: 20,
     lookalike_low: 10,
     scam_trigger_each: 12,
-    /** Caps the total scam-trigger contribution. */
-    scam_trigger_max_total: 36,
+    /**
+     * Caps the total scam-trigger contribution (5 categories). Raised from 36
+     * so that a message with four or more distinct scam patterns reaches the
+     * Caution tier even when AI interpretation is unavailable.
+     */
+    scam_trigger_max_total: 60,
+    /** Link-structure rules (lib/checks/urlStructure.ts), per URL. */
+    url_ip_address_host: 25,
+    url_credentials_in_url: 25,
+    url_punycode_host: 20,
+    url_deceptive_domain_structure: 20,
+    url_digit_letter_swap: 20,
+    /** One or two sensitive words in the hostname. */
+    url_sensitive_host_keywords: 15,
+    /** Three or more distinct sensitive words in the hostname. */
+    url_sensitive_host_keywords_many: 25,
+    url_sensitive_path_keywords: 10,
+    url_many_hyphens: 8,
+    url_nonstandard_port: 10,
     /** Domains younger than this many days add risk. */
     domain_age_young_days: 90,
     domain_age_young: 10,

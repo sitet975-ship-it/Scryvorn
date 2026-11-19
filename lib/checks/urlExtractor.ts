@@ -1,3 +1,5 @@
+import urlRiskSignals from "@/data/urlRiskSignals.json";
+
 /**
  * URL extractor (pure, deterministic).
  *
@@ -7,6 +9,16 @@
 
 /** Matches http(s):// URLs and bare `www.` hosts up to whitespace or <>" chars. */
 const CANDIDATE_RE = /(?:https?:\/\/|www\.)[^\s<>"]+/gi;
+
+/**
+ * Bare links written without http:// or www. ("paypa1-login.com/verify").
+ * The match must not start inside a word, an email address ("@"), or another
+ * URL, and its top-level domain must be on the reviewed `bareDomainTlds`
+ * list (data/urlRiskSignals.json), so "Node.js" or "e.g." are not links.
+ */
+const BARE_RE =
+  /(?<![\p{L}\p{N}@._\/:-])(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,24})(?::\d{2,5})?(?:\/[^\s<>"]*)?(?![\p{L}\p{N}_-])/giu;
+const BARE_TLDS = new Set(urlRiskSignals.bareDomainTlds.map((t) => t.toLowerCase()));
 
 const TRAILING_PUNCTUATION = new Set([".", ",", "!", "?", ";", ":", "'", '"', ")", "]", "}"]);
 
@@ -45,10 +57,11 @@ function isValidUrl(candidate: string): boolean {
 }
 
 /**
- * Extract every http(s) URL and bare `www.` host from `text`.
+ * Extract every http(s) URL, bare `www.` host, and bare "name.tld" link
+ * (reviewed TLDs only) from `text`.
  *
  * - Returns each URL in its ORIGINAL form as written (after trailing
- *   punctuation is stripped); `www.` hosts are NOT rewritten with a scheme.
+ *   punctuation is stripped); scheme-less links are NOT rewritten with a scheme.
  * - Unparseable tokens and tokens without a hostname are skipped; never throws.
  * - Duplicates (exact string match) are removed, preserving first-seen order,
  *   so identical input always yields identical output.
@@ -60,8 +73,22 @@ export function extractUrls(text: string): string[] {
   const seen = new Set<string>();
   const result: string[] = [];
 
-  for (const match of text.matchAll(CANDIDATE_RE)) {
-    const candidate = stripTrailing(match[0]);
+  const candidates: { index: number; end: number; value: string }[] = [];
+  for (const m of text.matchAll(CANDIDATE_RE)) {
+    candidates.push({ index: m.index ?? 0, end: (m.index ?? 0) + m[0].length, value: m[0] });
+  }
+  const explicit = candidates.slice();
+  for (const m of text.matchAll(BARE_RE)) {
+    const start = m.index ?? 0;
+    const end = start + m[0].length;
+    if (!BARE_TLDS.has(m[1].toLowerCase())) continue;
+    if (explicit.some((c) => start < c.end && end > c.index)) continue;
+    candidates.push({ index: start, end, value: m[0] });
+  }
+  candidates.sort((a, b) => a.index - b.index);
+
+  for (const match of candidates) {
+    const candidate = stripTrailing(match.value);
     if (!candidate || seen.has(candidate)) continue;
     if (!isValidUrl(candidate)) continue;
     seen.add(candidate);

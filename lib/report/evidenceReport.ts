@@ -129,6 +129,7 @@ export const CHECK_LABELS: Readonly<Record<CheckName, string>> = Object.freeze({
   https_status: "HTTPS status",
   shortener: "URL-shortener detection",
   domain_heuristic: "Domain heuristics (elevated-attention TLD and lookalike)",
+  url_structure: "Link structure (address patterns)",
   scam_triggers: "Scam-trigger phrase detection",
   domain_age: "Domain age",
 });

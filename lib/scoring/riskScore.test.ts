@@ -57,12 +57,17 @@ describe("computeRiskScore", () => {
     expect(computeRiskScore(info, [])).toBe(0);
   });
 
-  it("caps deterministic scam-trigger findings at scam_trigger_max_total (36)", () => {
-    expect(W.scam_trigger_max_total).toBe(36);
+  it("caps deterministic scam-trigger findings at scam_trigger_max_total (60)", () => {
+    expect(W.scam_trigger_max_total).toBe(60);
     const two = [trigger("a"), trigger("b")];
-    const five = ["a", "b", "c", "d", "e"].map(trigger);
+    const four = ["a", "b", "c", "d"].map(trigger);
+    const seven = ["a", "b", "c", "d", "e", "f", "g"].map(trigger);
     expect(computeRiskScore(two, [])).toBe(24);
-    expect(computeRiskScore(five, [])).toBe(36);
+    expect(computeRiskScore(four, [])).toBe(48);
+    expect(severityTierForScore(48).tier).toBe("Caution — verify before acting");
+    expect(computeRiskScore(seven, [])).toBe(60);
+    // Message rules alone never reach TRAP DETECTED.
+    expect(severityTierForScore(60).tier).toBe("Caution — verify before acting");
   });
 
   it("does not apply the scam-trigger cap to AI findings, even with matching categories", () => {
@@ -70,9 +75,18 @@ describe("computeRiskScore", () => {
       ai("medium", c),
     );
     expect(computeRiskScore([], aiFindings)).toBe(45);
-    // Cap applies only to the deterministic part: 36 + 45.
+    // Cap applies only to the deterministic part: 24 + 45.
+    const two = ["a", "b"].map(trigger);
+    expect(computeRiskScore(two, aiFindings)).toBe(69);
+    const seven = ["a", "b", "c", "d", "e", "f", "g"].map(trigger);
+    expect(computeRiskScore(seven, aiFindings)).toBe(100);
+  });
+
+  it("does not cap link-structure findings", () => {
+    const link = det("url_structure", "ip_address_host", W.url_ip_address_host);
     const five = ["a", "b", "c", "d", "e"].map(trigger);
-    expect(computeRiskScore(five, aiFindings)).toBe(81);
+    expect(computeRiskScore([link, ...five], [])).toBe(25 + 60);
+    expect(severityTierForScore(85).tier).toBe("TRAP DETECTED");
   });
 
   it("keeps other deterministic contributions additive: repeated shortened URLs reach TRAP", () => {

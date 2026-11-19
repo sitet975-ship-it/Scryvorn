@@ -1,0 +1,15 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Re-check scoring rules after detection changes",
+      "trigger": "PostFileSave",
+      "description": "When a deterministic check, scoring rule, or rule data file is saved, reminds the agent to run the related tests and keep the No Evidence, No Verdict rules.",
+      "matcher": "(lib[\\\\/](checks|scoring|ai)[\\\\/]|data[\\\\/][^\\\\/]+\\.json$)",
+      "action": {
+        "type": "agent",
+        "prompt": "A Scryvorn detection, scoring, or rule-data file was just saved. Before finishing: (1) run `npx vitest run lib/checks lib/scoring lib/samples lib/report` and fix any failure; (2) confirm every new or changed finding quotes the text or address part that triggered it and names its rule or data file; (3) confirm no wording calls a message or link safe, verified, legitimate, or fraudulent; (4) if a weight or the scam-trigger cap changed, update the expected sample scores in lib/samples/sampleTraps.test.ts and the scoring section of .kiro/specs/scryvorn/design.md."
+      }
+    }
+  ]
+}

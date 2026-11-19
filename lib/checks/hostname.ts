@@ -6,14 +6,33 @@
  * "registrable domain" match.
  */
 
+const HAS_SCHEME = /^[a-z][a-z0-9+.-]*:\/\//i;
+
+/**
+ * Parses a URL with the WHATWG URL parser (syntax only, never resolved).
+ * Links written without a scheme ("www.x.com", "x.com/login") are parsed as
+ * http:// for inspection only. Returns null if unparseable. Never throws.
+ */
+export function parseUrl(url: string): URL | null {
+  if (typeof url !== "string" || url.trim() === "") return null;
+  try {
+    return new URL(HAS_SCHEME.test(url) ? url : `http://${url}`);
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Parses a URL and returns its lowercase hostname with a single trailing dot
- * removed. Returns null if the URL is unparseable or the hostname is empty.
+ * removed. Scheme-less links ("www.x.com") are accepted (see parseUrl).
+ * Returns null if the URL is unparseable or the hostname is empty.
  * Never throws.
  */
 export function parseHostname(url: string): string | null {
   try {
-    let host = new URL(url).hostname.toLowerCase();
+    const parsed = parseUrl(url);
+    if (!parsed) return null;
+    let host = parsed.hostname.toLowerCase();
     if (host.endsWith(".")) host = host.slice(0, -1);
     return host.length > 0 ? host : null;
   } catch {

@@ -1,6 +1,7 @@
 import elevatedAttentionTlds from "@/data/elevatedAttentionTlds.json";
 import scamTriggers from "@/data/scamTriggers.json";
 import shorteners from "@/data/shorteners.json";
+import urlRiskSignals from "@/data/urlRiskSignals.json";
 import { domainAgeUnavailableFinding, lookupDomainAge } from "./domainAgeLookup";
 import { domainHeuristic, isLookalikeCheckActive } from "./domainHeuristic";
 import { checkHttps } from "./httpsValidator";
@@ -16,12 +17,15 @@ import type {
   RequiredCheckName,
   ScamTriggerSet,
   ShortenerList,
+  UrlRiskSignals,
 } from "./types";
 import { extractUrls } from "./urlExtractor";
+import { checkUrlStructure } from "./urlStructure";
 
 const SHORTENER_LIST: ShortenerList = shorteners;
 const TLD_LIST: ElevatedAttentionTldList = elevatedAttentionTlds;
 const TRIGGER_SET: ScamTriggerSet = scamTriggers;
+const URL_SIGNALS: UrlRiskSignals = urlRiskSignals;
 
 /** Required checks, in pipeline order. Domain age is optional. */
 const REQUIRED_CHECKS: readonly RequiredCheckName[] = [
@@ -29,6 +33,7 @@ const REQUIRED_CHECKS: readonly RequiredCheckName[] = [
   "https_status",
   "shortener",
   "domain_heuristic",
+  "url_structure",
   "scam_triggers",
 ];
 
@@ -48,7 +53,7 @@ export interface DeterministicEngineOptions {
  * Orchestrates the deterministic checks in a fixed order:
  *  1. extractUrls(input)
  *  2. for each unique URL, in extraction order: checkHttps, detectShortener
- *     (if it flags), domainHeuristic
+ *     (if it flags), domainHeuristic, checkUrlStructure
  *  3. detectScamTriggers(input)
  *  4. optional domain-age lookup
  *
@@ -98,10 +103,12 @@ export async function runDeterministicChecks(
       const shortener = detectShortener(url, SHORTENER_LIST);
       if (shortener) findings.push(shortener);
       findings.push(...domainHeuristic(url, TLD_LIST, opts?.legitimateDomains));
+      findings.push(...checkUrlStructure(url, URL_SIGNALS));
     }
     finished.add("https_status");
     finished.add("shortener");
     finished.add("domain_heuristic");
+    finished.add("url_structure");
 
     // 3. Scam triggers.
     findings.push(...detectScamTriggers(text, TRIGGER_SET));

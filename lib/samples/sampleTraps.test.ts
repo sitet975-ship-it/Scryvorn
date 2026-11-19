@@ -69,17 +69,19 @@ describe("SAMPLE_TRAPS deterministic outcomes (no AI, no domain-age service)", (
       ],
     ]);
     expect(o.ageNotes).toEqual(["domain_age_unavailable:not_configured"]);
-    // 4 x 12 = 48, capped at 36 for scam triggers. Without AI this is the
-    // Low-risk tier: the deterministic score alone is a weak signal here.
-    expect(o.deterministicOnlyScore).toBe(36);
-    expect(severityTierForScore(36).tier).toBe("Low risk — still verify independently");
+    // 4 x 12 = 48 (scam-trigger cap is 60). The link has no risky structure.
+    // Without AI this already reaches the Caution tier.
+    expect(o.deterministicOnlyScore).toBe(48);
+    expect(severityTierForScore(48).tier).toBe("Caution — verify before acting");
   });
 
-  it("Phishing Payment Link: three scam-trigger findings, non-HTTPS context, domain-age note", async () => {
+  it("Phishing Payment Link: link-structure and scam-trigger findings, non-HTTPS context, domain-age note", async () => {
     const o = await outcome("Phishing Payment Link");
     expect(o.det.status).toBe("complete");
     expect(o.det.incompleteChecks).toEqual([]);
     expect(o.scored).toEqual([
+      ["sensitive_host_keywords", undefined, 15],
+      ["sensitive_path_keywords", undefined, 10],
       ["upfront_payment", "processing fee", 12],
       ["credential_request", "Verify your identity", 12],
       ["urgency_pressure", "FINAL NOTICE", 12],
@@ -92,7 +94,9 @@ describe("SAMPLE_TRAPS deterministic outcomes (no AI, no domain-age service)", (
       ],
     ]);
     expect(o.ageNotes).toEqual(["domain_age_unavailable:not_configured"]);
-    expect(o.deterministicOnlyScore).toBe(36);
+    // "billing" in the host (15) + "verify" in the path (10) + 3 x 12 = 61.
+    expect(o.deterministicOnlyScore).toBe(61);
+    expect(severityTierForScore(61).tier).toBe("Caution — verify before acting");
   });
 
   it("Legitimate Bank Alert: complete run with zero findings of any kind", async () => {

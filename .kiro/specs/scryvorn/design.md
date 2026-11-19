@@ -537,7 +537,18 @@ export const SCORING_WEIGHTS = {
     lookalike_high: 20,
     lookalike_low: 10,
     scam_trigger_each: 12,
-    scam_trigger_max_total: 36, // caps total trigger contribution
+    scam_trigger_max_total: 60, // caps total trigger contribution (5 categories; raised from 36)
+    // Link-structure rules (lib/checks/urlStructure.ts, data/urlRiskSignals.json), per URL, uncapped:
+    url_ip_address_host: 25,
+    url_credentials_in_url: 25,       // text before "@" hides the real host
+    url_punycode_host: 20,
+    url_deceptive_domain_structure: 20, // ".com" before the real domain, or 6+ labels
+    url_digit_letter_swap: 20,        // "amaz0n", "g00gle"
+    url_sensitive_host_keywords: 15,  // 1–2 words such as "login", "verify"
+    url_sensitive_host_keywords_many: 25, // 3+ distinct words
+    url_sensitive_path_keywords: 10,
+    url_many_hyphens: 8,
+    url_nonstandard_port: 10,
     domain_age_young_days: 90,  // younger than this adds risk
     domain_age_young: 10,
     https_status: 0,            // informational only (Req 4.8)
@@ -567,6 +578,8 @@ export const FALLBACK_VERIFICATION_STEPS = [
 ```
 
 **Decision: elevated-attention TLDs are informational only.** Elevated-attention TLD matches are shown as informational context requiring review. They carry weight 0, do not change the Risk_Score, and cannot by themselves escalate the Severity_Tier (Req 4.13). Informational findings (weight 0: `https_status`, `elevated_attention_tld`, `domain_age_unavailable`) are kept distinct from scored risk contributions.
+
+**Decision (Task 15): deterministic checks must score unseen fake links without AI.** A new `url_structure` required check inspects how each extracted address is built (raw IP host, hidden text before "@", punycode, ".com" placed before the real domain, digits standing in for letters, sensitive words in the host or path, many hyphens, unusual ports). It never fetches or resolves a link. The URL extractor also accepts bare `name.tld` links when the TLD is on the reviewed `bareDomainTlds` list. The scam-trigger cap is 60, so message rules alone can reach Caution (four or more categories) but never TRAP DETECTED; TRAP DETECTED from rules alone needs link evidence too. Sample outcomes without AI: Fake Remote Job DM 48 (Caution), Phishing Payment Link 61 (Caution), Legitimate Bank Alert 0. Elevated-attention TLDs and HTTPS status stay informational (weight 0).
 
 `computeRiskScore` sums these weights (capping the total scam-trigger contribution at `scam_trigger_max_total`), clamps to `[0,100]`, and rounds to an integer. Because the weights and clamp are fixed, identical findings always yield an identical score and the tier is derived purely from that score.
 

@@ -1,7 +1,7 @@
 {
-  "version": "2026.01",
+  "version": "2026.02",
   "source": "https://example.org/scam-trigger-phrase-sets",
-  "date": "2026-01-01",
+  "date": "2026-11-19",
   "categories": [
     {
       "id": "upfront_payment",
@@ -13,7 +13,14 @@
         "advance payment",
         "pay upfront",
         "clearance fee",
-        "release fee"
+        "release fee",
+        "activation fee",
+        "unlock fee",
+        "security deposit",
+        "training fee",
+        "small fee",
+        "handling fee",
+        "transfer fee"
       ]
     },
     {
@@ -26,7 +33,19 @@
         "verify your identity",
         "confirm your code",
         "send the otp",
-        "provide your credentials"
+        "provide your credentials",
+        "one-time code",
+        "verification code",
+        "login details",
+        "verify your account",
+        "confirm your account",
+        "confirm your details",
+        "update your payment",
+        "card details",
+        "bank details",
+        "seed phrase",
+        "recovery phrase",
+        "private key"
       ]
     },
     {
@@ -40,7 +59,12 @@
         "expires today",
         "within 24 hours",
         "don't delay",
-        "final notice"
+        "final notice",
+        "within 48 hours",
+        "last chance",
+        "final warning",
+        "right away",
+        "before it's too late"
       ]
     },
     {
@@ -52,7 +76,12 @@
         "continue on signal",
         "email me directly",
         "contact me outside",
-        "move to another platform"
+        "move to another platform",
+        "text me on whatsapp",
+        "contact me on whatsapp",
+        "add me on telegram",
+        "contact me on telegram",
+        "dm me on telegram"
       ]
     },
     {
@@ -64,7 +93,10 @@
         "ethereum payment",
         "crypto wallet",
         "transfer usdt",
-        "send to this wallet address"
+        "send to this wallet address",
+        "pay in usdt",
+        "pay in crypto",
+        "bitcoin atm"
       ]
     },
     {
@@ -77,7 +109,78 @@
         "no experience needed",
         "unlimited earnings",
         "get paid daily",
-        "high salary no interview"
+        "high salary no interview",
+        "no experience required",
+        "part-time job",
+        "commission per task",
+        "daily payout",
+        "earn per day"
+      ]
+    },
+    {
+      "id": "account_threat",
+      "label": "account threat",
+      "phrases": [
+        "account will be suspended",
+        "account has been suspended",
+        "account will be locked",
+        "account has been locked",
+        "account will be closed",
+        "account will be deactivated",
+        "unusual activity",
+        "suspicious activity",
+        "unauthorized login",
+        "unauthorised login"
+      ]
+    },
+    {
+      "id": "prize_lure",
+      "label": "prize or reward lure",
+      "phrases": [
+        "you have won",
+        "you've won",
+        "claim your prize",
+        "claim your reward",
+        "lottery winner",
+        "selected as a winner",
+        "lucky winner",
+        "cash prize"
+      ]
+    },
+    {
+      "id": "gift_card_payment",
+      "label": "gift card payment",
+      "phrases": [
+        "pay with gift cards",
+        "buy gift cards",
+        "gift card codes",
+        "itunes card",
+        "google play card",
+        "steam card"
+      ]
+    },
+    {
+      "id": "delivery_pretext",
+      "label": "delivery pretext",
+      "phrases": [
+        "redelivery fee",
+        "package is on hold",
+        "parcel is on hold",
+        "delivery attempt failed",
+        "unpaid shipping",
+        "customs fee",
+        "reschedule your delivery"
+      ]
+    },
+    {
+      "id": "investment_lure",
+      "label": "investment lure",
+      "phrases": [
+        "guaranteed returns",
+        "guaranteed profit",
+        "double your money",
+        "risk-free investment",
+        "daily profit"
       ]
     }
   ]

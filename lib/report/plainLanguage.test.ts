@@ -33,7 +33,12 @@ function result(over: Partial<CompleteScanResult>): CompleteScanResult {
 describe("plain-English wording", () => {
   it("covers every scam-trigger category and every scored link category the engine produces", () => {
     for (const c of scamTriggers.categories) expect(FINDING_WORDING, c.id).toHaveProperty(c.id);
-    for (const c of ["shortener", "lookalike", "domain_age"]) expect(FINDING_WORDING, c).toHaveProperty(c);
+    const linkCategories = [
+      "shortener", "lookalike", "domain_age",
+      "ip_address_host", "credentials_in_url", "punycode_host", "deceptive_domain_structure",
+      "digit_letter_swap", "sensitive_host_keywords", "sensitive_path_keywords", "many_hyphens", "nonstandard_port",
+    ];
+    for (const c of linkCategories) expect(FINDING_WORDING, c).toHaveProperty(c);
   });
 
   it("never calls anything safe, legitimate, or fraudulent, and never claims certainty", () => {

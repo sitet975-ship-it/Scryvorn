@@ -40,6 +40,7 @@ describe("data files", () => {
     "data/shorteners.json": "domains",
     "data/elevatedAttentionTlds.json": "tlds",
     "data/scamTriggers.json": "categories",
+    "data/urlRiskSignals.json": "hostKeywords",
   };
 
   it.each(Object.entries(files))("%s has version, source, date, and a non-empty %s list", (file, listKey) => {

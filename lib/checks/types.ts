@@ -8,6 +8,7 @@ export type CheckName =
   | "https_status"
   | "shortener"
   | "domain_heuristic"
+  | "url_structure"
   | "scam_triggers"
   | "domain_age";
 
@@ -96,6 +97,21 @@ export interface ElevatedAttentionTldList {
   source: string;
   date: string;
   tlds: string[];
+}
+
+/** Versioned link-structure rule set (data/urlRiskSignals.json). */
+export interface UrlRiskSignals {
+  version: string;
+  source: string;
+  date: string;
+  /** Whole words in the hostname that often appear in phishing addresses. */
+  hostKeywords: string[];
+  /** Whole words in the path or query that often appear in phishing addresses. */
+  pathKeywords: string[];
+  /** Domain endings that are suspicious when they appear before the real domain. */
+  embeddedTldLabels: string[];
+  /** Top-level domains for which a bare "name.tld" (no http:// or www.) is treated as a link. */
+  bareDomainTlds: string[];
 }
 
 export interface ScamTriggerCategory {

@@ -75,6 +75,76 @@ export const FINDING_WORDING: Readonly<Record<string, Wording>> = Object.freeze(
     explanation:
       "This link points to a recently registered domain. New domains can be used for short-lived scams, so verify the site independently.",
   },
+  account_threat: {
+    phrase: "a warning that your account is at risk",
+    explanation:
+      "This warns that your account is locked, suspended, or showing unusual activity. Check your account by opening the official app or website yourself, not through this message.",
+  },
+  prize_lure: {
+    phrase: "a prize or reward you did not expect",
+    explanation:
+      "This says you have won something or have a reward waiting. Unexpected prizes are a common way to get personal details or a fee from you.",
+  },
+  gift_card_payment: {
+    phrase: "a request to pay with gift cards",
+    explanation:
+      "This asks for payment with gift cards or their codes. Gift-card payments are hard to trace or reverse, and real organizations rarely ask for them.",
+  },
+  delivery_pretext: {
+    phrase: "a parcel or delivery problem that needs action",
+    explanation:
+      "This claims a parcel is held or a delivery failed and asks you to act. Check the delivery through the courier's official app or website yourself.",
+  },
+  investment_lure: {
+    phrase: "promises of unusually high or certain returns",
+    explanation:
+      "This promises fixed or unusually high returns. Real investments carry risk, so research the offer independently before sending money.",
+  },
+  ip_address_host: {
+    phrase: "a link to a raw IP address instead of a website name",
+    explanation:
+      "This link goes to a number-only address instead of a named website. Organizations rarely send links like this, so do not sign in or pay through it.",
+  },
+  credentials_in_url: {
+    phrase: "a link whose real destination is hidden after an \"@\"",
+    explanation:
+      "Everything before the \"@\" in this link is ignored by the browser, so the link opens a different site than it appears to. Do not use it.",
+  },
+  punycode_host: {
+    phrase: "a web address with special characters that can imitate familiar letters",
+    explanation:
+      "This address uses encoded special characters, which can look like ordinary letters. Type the organization's address yourself instead of using this link.",
+  },
+  deceptive_domain_structure: {
+    phrase: "a web address built to look like a different site",
+    explanation:
+      "This address puts a familiar ending such as \".com\" before its real domain, or hides the real domain behind many levels. Read the address from the right to see which site it belongs to.",
+  },
+  digit_letter_swap: {
+    phrase: "a web address with digits standing in for letters",
+    explanation:
+      "This address uses digits like \"0\" or \"1\" in place of letters, a common way to imitate familiar names. Check the spelling carefully before trusting it.",
+  },
+  sensitive_host_keywords: {
+    phrase: "official-sounding words such as \"login\" or \"verify\" in the web address",
+    explanation:
+      "The web address contains words like \"login\", \"secure\", or \"verify\". Anyone can put these words in an address, so they say nothing about who runs the site.",
+  },
+  sensitive_path_keywords: {
+    phrase: "a link to a sign-in, verification, or payment page",
+    explanation:
+      "This link leads to a page about signing in, verifying, or paying. Reach those pages through the official app or website instead of a link in a message.",
+  },
+  many_hyphens: {
+    phrase: "a long hyphenated web address",
+    explanation:
+      "This address strings many words together with hyphens, which is often used to make an address sound official. Check which domain it really belongs to.",
+  },
+  nonstandard_port: {
+    phrase: "a link with an unusual port number",
+    explanation:
+      "This link specifies a port number, which ordinary websites rarely do in links they send. Treat it with extra care.",
+  },
 });
 
 const wordingFor = (category: string): Wording | null =>

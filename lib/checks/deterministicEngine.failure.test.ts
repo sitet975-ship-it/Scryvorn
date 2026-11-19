@@ -120,6 +120,7 @@ describe("runDeterministicChecks with forced internal failures", () => {
       "https_status",
       "shortener",
       "domain_heuristic",
+      "url_structure",
       "scam_triggers",
     ]);
     const httpsUrls = r.findings
@@ -153,6 +154,7 @@ describe("runDeterministicChecks with forced internal failures", () => {
       "https_status",
       "shortener",
       "domain_heuristic",
+      "url_structure",
       "scam_triggers",
     ]);
     expectNoLeak(r);

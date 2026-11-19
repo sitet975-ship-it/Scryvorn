@@ -308,7 +308,7 @@ The implementation follows the layered architecture from the design: pure determ
     - ScannerInput error text now uses Dark Ink with a Crimson Wax left accent border (Task 8 follow-up resolved).
     - Without AI configured, "Fake Remote Job DM" and "Phishing Payment Link" each produce a deterministic score of 36 and display the Low-risk tier. Their scored findings can come only from scam-trigger phrases, because .example and .test domains are not in the shortener or elevated-attention TLD lists, and the scam-trigger total is capped at 36.
     - Accepted for the synthetic offline samples. AI is not assumed to elevate either sample to Caution or TRAP DETECTED: live AI output is model-dependent and must be verified on a deploy preview.
-    - No demo-only entries are to be added to the production scam-trigger, shortener, or elevated-attention TLD data lists at this time. SCORING_WEIGHTS and the scam-trigger cap stay unchanged.
+    - No demo-only entries are to be added to the production scam-trigger, shortener, or elevated-attention TLD data lists at this time. SCORING_WEIGHTS and the scam-trigger cap stay unchanged. (Superseded by Task 15: the cap is now 60 and link-structure rules were added; see design "Scoring Configuration".)
     - Not verified by automated tests (jsdom): spiderweb overlap with the input/results areas, absence of horizontal scrolling at 360/768/1024 px, real focus rings and tab order, real clipboard writes, real downloads, and real network behavior against a deployed `/api/scan`. These need manual browser checks.
     - Pumpkin Orange focus outlines on parchment measure about 2.81:1, below the 3:1 non-text contrast target; not changed in Task 9 and needs a follow-up decision.
 
@@ -397,6 +397,13 @@ The implementation follows the layered architecture from the design: pure determ
   - Flow: a Submit / Examine / Results / Report step indicator; the examining view lists the three real pipeline stages; "Start a new investigation" begins a fresh, empty examination.
   - Decorations: the caped vampires are removed; the cathedral cobwebs are replaced with gothic corner tracery and stone gargoyles; ghosts on both sides; bats on independent flight paths; fewer, spread-out lanterns and candles.
   - Performance: decorative motion animates only transform and opacity; blur and drop-shadow filters on moving elements are removed; the tarantula walks with a compositor transform (container query units) and its legs and body are separate layers; the radar sweep is its own rotating layer.
+
+- [ ] 15. Deterministic detection for unseen links, and Kiro hooks (uncommitted, awaiting review)
+  - New required check `url_structure` (`lib/checks/urlStructure.ts`, rules in `data/urlRiskSignals.json`): raw IP host, text hidden before "@", punycode, ".com" placed before the real domain or 6+ labels, digits standing in for letters, sensitive words in the host (heavier with 3+) or path, 3+ hyphens, non-default port. Pure parsing; links are never fetched. Each finding quotes the address part and cites the rule set.
+  - `extractUrls` also accepts bare `name.tld` links when the TLD is on the reviewed `bareDomainTlds` list (not emails, file names, or names like "Node.js"). `parseHostname` accepts scheme-less links, so `www.` hosts now get domain checks too.
+  - Scam-trigger phrase sets expanded (v2026.02): new categories account threat, prize lure, gift-card payment, delivery pretext, investment lure, plus more phrases in the existing categories. Reviewed plain-English wording added for every new category.
+  - `scam_trigger_max_total` raised from 36 to 60. Without AI: Fake Remote Job DM 48 (Caution), Phishing Payment Link 61 (Caution), Legitimate Bank Alert 0.
+  - Kiro hooks in `.kiro/hooks/`: `secret-guard.json` (PreToolUse; `scripts/hooks/secret-guard.mjs` blocks writes containing real-looking keys or private keys) and `evidence-rules-on-save.json` (PostFileSave on `lib/checks`, `lib/scoring`, `lib/ai`, `data/*.json`; asks the agent to run the rule tests and keep the No Evidence, No Verdict wording).
 
 ## Notes
 

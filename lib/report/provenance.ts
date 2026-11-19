@@ -20,6 +20,7 @@ const DETERMINISTIC_SOURCE: Readonly<Record<CheckName, EvidenceSource>> = Object
   https_status: "link_checks",
   shortener: "link_checks",
   domain_heuristic: "link_checks",
+  url_structure: "link_checks",
   domain_age: "link_checks",
 });
 

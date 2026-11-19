@@ -53,6 +53,27 @@ describe("extractUrls", () => {
     expect(extractUrls(input)).toEqual(extractUrls(input));
   });
 
+  it("extracts bare name.tld links on reviewed TLDs, in text order", () => {
+    expect(
+      extractUrls("Log in at amaz0n-login.com/verify now, or paypal.com.secure-check.xyz. Also https://x.test"),
+    ).toEqual(["amaz0n-login.com/verify", "paypal.com.secure-check.xyz", "https://x.test"]);
+  });
+
+  it("does not treat emails, file names, abbreviations, or tech names as links", () => {
+    expect(extractUrls("Email support@bank.com, see report.pdf, e.g. Node.js and Next.js, v1.2.3")).toEqual([]);
+  });
+
+  it("does not split an explicit URL or www host into a second bare link", () => {
+    expect(extractUrls("https://shop.example.com/x and www.paypal.com")).toEqual([
+      "https://shop.example.com/x",
+      "www.paypal.com",
+    ]);
+  });
+
+  it("ignores bare names on TLDs that are not on the reviewed list", () => {
+    expect(extractUrls("careers-portal.example and pay.test")).toEqual([]);
+  });
+
   it("never calls fetch", () => {
     const fetchStub = vi.fn(() => {
       throw new Error("fetch must not be called");

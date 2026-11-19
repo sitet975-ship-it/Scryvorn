@@ -242,7 +242,8 @@ describe("AI unavailable: deterministic-only results", () => {
     fetchMock.mockResolvedValueOnce(aiResponse(AI_HIGH));
     const { json } = await scan();
     expect(json.riskScore).toBeGreaterThan(detOnly);
-    expect(detOnly).toBe(39); // shortener 15 + two scam triggers 12 + 12 (synthetic input)
+    // shortener 15 + "claim" in the link path 10 + two scam triggers 12 + 12 (synthetic input)
+    expect(detOnly).toBe(49);
   });
 });
 
